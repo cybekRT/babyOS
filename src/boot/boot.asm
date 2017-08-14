@@ -1,8 +1,9 @@
 [bits 16]
-org 0x7c00
+[org 0x7c00]
+[cpu 286]
 
 init:
-	mov	[DRIVE_NUMBER], cl
+	mov	[DRIVE_NUMBER], dl
 
 	; Read whole kernel
 	mov	ah, 02h
@@ -21,6 +22,13 @@ init:
 	jmp	0x0:0x500
 
 error:
+	mov	bx, 0xb800
+	mov	es, bx
+	mov	bx, 0
+	mov	byte [es:bx+0], 'X'
+	mov	byte [es:bx+2], 'X'
+	mov	byte [es:bx+4], 'X'
+
 	int	0x18
 
 DRIVE_NUMBER: db 0

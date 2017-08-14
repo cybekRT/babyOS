@@ -10,8 +10,9 @@ Terminal_Init:
 	mov	al, 0x2
 	int	0x10
 
-	cmp	al, 0x30
-	jne	Panic
+	; this check doesn't work on AMI 386DX
+	;cmp	al, 0x30
+	;jne	Panic
 
 	; disable blinking
 	mov	ah, 1
@@ -31,8 +32,15 @@ Terminal_Init:
 
 	add	bx, 2
 	loop	.clear_loop
-	
+
+	; Say hello
+	push	.hello
+	call	Terminal_Write
+	add	sp, 2
+
 	ret
+
+.hello db 'babyOS v0.1',0xA,0
 
 ; Text: [ds:bp+4]
 ; NULL-terminated
@@ -224,7 +232,7 @@ Terminal_Print:
 	push	si
 	push	di
 
-	mov	si, [ds:bp+4]
+	mov	si, [bp+4]
 	mov	di, bp
 	add	di, 6
 
@@ -267,13 +275,14 @@ Terminal_Print:
 	jmp	.spec_invalid
 
 .spec_d:
-	mov	ax, [di]
+	mov	ax, [ss:di]
 	add	di, 2
 
 	cmp	ax, 0
 	jnz	.spec_d_not_zero
 	mov	al, '0'
 	call	Terminal_Put
+	inc	si
 	jmp	.loop
 .spec_d_not_zero:
 	mov	bx, .bufferEnd
@@ -309,13 +318,14 @@ Terminal_Print:
 	jmp	.loop
 
 .spec_u:
-	mov	ax, [di]
+	mov	ax, [ss:di]
 	add	di, 2
 
 	cmp	ax, 0
 	jnz	.spec_u_not_zero
 	mov	al, '0'
 	call	Terminal_Put
+	inc	si
 	jmp	.loop
 .spec_u_not_zero:
 	mov	bx, .bufferEnd
@@ -323,7 +333,7 @@ Terminal_Print:
 	jmp	.spec_d_loop
 
 .spec_s:
-	mov	ax, [di]
+	mov	ax, [ss:di]
 	add	di, 2
 
 	push	ax
@@ -343,7 +353,7 @@ Terminal_Print:
 	mov	al, 'x'
 	call	Terminal_Put
 .spec_x_after_0x:
-	mov	ax, [di]
+	mov	ax, [ss:di]
 	add	di, 2
 	mov	cx, 4
 .spec_x_loop:

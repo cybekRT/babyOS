@@ -1,3 +1,4 @@
-.vscode
-bochsout.txt
-out
+/bochsout.txt
+/out/
+/lst/
+.DS_Store

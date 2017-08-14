@@ -1,25 +1,16 @@
 [bits 16]
-org 0x500
+[org 0x500]
+[CPU 386]
 KERNEL_BEGIN:
-
-jmp	init
+	jmp	init
 
 %include "Terminal.asm"
 %include "Memory.asm"
 
-wwait:
-	push	cx
-
-	mov	cx, 0xffff
-.a:
-	cmp	cx, 0
-	dec	cx
-	jnz	.a
-
-	pop	cx
-	ret
-
 init:
+	mov	bx, 0
+	mov	gs, bx
+
 	; 
 	cli
 	mov	bx, cs
@@ -31,24 +22,17 @@ init:
 	call	Terminal_Init
 	call	Memory_Init
 
-	; init stack
-	;push	1024
-	;call	Memory_Alloc
-	;mov	ss, ax
-	;mov	sp, 1024
-
-	; Say hello
-	push	hello
-	push	0x1234
-	push	65535
-	push	-1234
-	push	hello
-	call	printf
-	add	sp, 6
+	; Alloc memory for stack
+	push	2048
+	call	Memory_AllocBytes
+	mov	ss, ax
+	mov	sp, 2048
 
 	call	Panic
 
 Panic:
+	call	Memory_PrintMap
+
 	; [bp] - ip
 	mov	bp, sp
 
@@ -60,7 +44,7 @@ Panic:
 	push	sp
 	push	ss
 	push	di
-	push	si,
+	push	si
 	push	dx
 	push	cx
 	push	bx
@@ -72,7 +56,6 @@ Panic:
 	hlt
 	jmp	Panic
 
-hello: db 'babyOS v0.1: %d %u % %% %x %a %s',0xA,0
 panicMsg: db 0xA,'Kernel halted!',0xA,\
 	'Registers:',0xA,\
 	'	AX: %x	BX: %x',0xA,\
@@ -82,6 +65,8 @@ panicMsg: db 0xA,'Kernel halted!',0xA,\
 	'	DS: %x	ES: %x',0xA,\
 	'	CS: %x	IP: %x'
 
-stackEnd: times 128 db 0
+stackEnd: times 64 db 0
 stackBegin:
-KERNEL_END:
+KERNEL_END equ $-$$ + 0x500
+
+;times 1474560 - ($-$$) - 512 db 0
