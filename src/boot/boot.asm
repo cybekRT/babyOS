@@ -1,37 +1,254 @@
 [bits 16]
 [org 0x7c00]
-[cpu 286]
+[cpu 386]
+%include "../global.asm"
 
-init:
-	mov	[DRIVE_NUMBER], dl
+; CHS
+; 80, 2, 18
 
-	; Read whole kernel
-	mov	ah, 02h
-	mov	al, (KERNEL_SIZE + 511) / 512
-	mov	cx, 2
-	mov	dh, 0
-	mov	dl, [DRIVE_NUMBER]
+;;;;; Structures
+struc DirectoryEntry
+	.name resb 8+3
+	.attributes resb 1
+	.reserved resb 2
+	.createTime resb 2
+	.createDate resb 2
+	.accessDate resb 2
+	.clusterHigh resb 2
+	.modificationTime resb 2
+	.modificationDate resb 2
+	.cluster resb 2
+	.size resb 4
+endstruc
 
+;;;;; Code
+BPB:
+	jmp short		bootcode
+	nop
+
+	oem			db 'MSDOS5.0'
+	bytesPerSector		dw 512
+	sectorsPerCluster	db 1
+	reservedSectors		dw ((KERNEL_SIZE + 511) / 512)
+	fatsCount		db 2
+	rootEntries		dw 224
+	totalSectors		dw 2880
+	mediaType		db 0xF0
+	sectorsPerFat		dw 0
+	sectorsPerTrack		dw 0
+	headsCount		dw 2
+	hiddenSectors		dd 0
+	unused			dd 0
+EBR:
+	driveNumber		db 0
+	reserved		db 0
+	signature		db 0x28
+	volumeId		db '1234'
+	label			db OS_NAME
+	systemId		db 'VMVMVMVM'
+
+bootcode:
+	mov	[driveNumber], dl
+	jmp	0:Init
+
+;;;;; Consts
+FILENAME db "KERNEL  BIN"
+ROOT_LOC equ (0x7c00 + 0x200)
+FAT_LOC equ (ROOT_LOC + 0x200)
+KERNEL_LOC equ 0x500
+;;;;; Variables
+rootSector db 0
+rootSectorEnd db 0
+rootOffset dw 0
+kernelCluster dw 0
+kernelPosition dw KERNEL_LOC
+fatSector dw 0xFFFF
+;;;;;
+
+Init:
+	; Calculate last root sector
+	mov	ax, [rootEntries]
+	shr	ax, 4
+	mov	[rootSectorEnd], al
+	; Calculate first root sector
+	mov	al, [sectorsPerFat]
+	mov	ah, [fatsCount]
+	mul	ah
+	add	ax, [reservedSectors]
+	mov	[rootSector], al
+	add	[rootSectorEnd], al
+
+; Search root entry
 	mov	bx, 0
+	mov	ds, bx
 	mov	es, bx
-	mov	bx, 0x500
+SearchKernel:
+	cmp	word [rootOffset], 0
+	jne	.dontRead
+	call	ReadRoot
+.dontRead:
+	; Set current filename offset
+	mov	di, ROOT_LOC + DirectoryEntry.name
+	add	di, [rootOffset]
+	; Compare
+	mov	cx, 8+3
+	mov	si, FILENAME
+	repe	cmpsb
+	je	ReadEntry
 
-	int	0x13
-	jc	error
+	add	word [rootOffset], DirectoryEntry_size
+	cmp	word [rootOffset], 512
+	jne	SearchKernel
+	mov	word [rootOffset], 0
+	jmp	SearchKernel
 
-	jmp	0x0:0x500
+ReadEntry:
+	mov	bx, ROOT_LOC + DirectoryEntry.cluster
+	add	bx, [rootOffset]
+	push	word [bx]
+	pop	word [kernelCluster]
 
-error:
+.loop:
+	cmp	word [kernelCluster], 0xFF8
+	jae	ExecuteKernel
+	call	ReadKernel
+	call	ReadFAT
+	jmp	.loop
+
+ExecuteKernel:
+	jmp	0x0:KERNEL_LOC ; Execute kernel
+
+Fail:
 	mov	bx, 0xb800
 	mov	es, bx
 	mov	bx, 0
 	mov	byte [es:bx+0], 'X'
-	mov	byte [es:bx+2], 'X'
-	mov	byte [es:bx+4], 'X'
+	mov	byte [es:bx+2], ' '
 
+; Boot other device...
 	int	0x18
 
-DRIVE_NUMBER: db 0
+;;;;; Functions
+ReadRoot:
+	mov	al, [rootSectorEnd]
+	cmp	byte [rootSector], al
+	je	Fail
 
+	; LBA 2 CHS
+	movzx	ax, byte [rootSector]
+	inc	byte [rootSector]
+
+	mov	bx, 0
+	mov	es, bx
+	mov	bx, ROOT_LOC
+	jmp	ReadSector
+
+;;;;;
+; Read FAT
+;;;;;
+ReadKernel:
+	mov	ax, word [kernelCluster]
+	sub	ax, 2
+	push	ax
+
+	mov	al, byte [sectorsPerFat] ; trim high-byte
+	mov	cl, [fatsCount]
+	mul	cl
+	push	ax
+
+	mov	ax, [rootEntries]
+	shr	ax, 4
+
+	add	ax, [reservedSectors]
+	pop	bx
+	add	ax, bx
+	pop	bx
+	add	ax, bx
+
+	mov	bx, 0
+	mov	es, bx
+	mov	bx, [kernelPosition]
+
+	call	ReadSector
+	add	word [kernelPosition], 512
+
+	ret
+
+;;;;;
+; Read FAT
+;;;;;
+ReadFAT:
+	mov	ax, [kernelCluster]
+	shr	ax, 9
+	;push	ax
+
+	cmp	ax, [fatSector]
+	je	.dontRead
+
+; Read FAT
+	add	ax, [reservedSectors]
+	push	ax
+	mov	bx, 0
+	mov	es, bx
+	mov	bx, FAT_LOC
+	call	ReadSector
+; Read FAT+1
+	pop	ax
+	inc	ax
+	mov	bx, 0
+	mov	es, bx
+	mov	bx, FAT_LOC + 0x200
+	call	ReadSector
+.dontRead:
+	mov	bx, [kernelCluster]
+	shr	bx, 1
+	add	bx, [kernelCluster]
+	and	bx, 0x1ff
+	add	bx, FAT_LOC
+	mov	ax, [bx]
+
+	test	word [kernelCluster], 1
+	jnz	.oddCluster
+	
+	and	ax, 0xfff
+	mov	[kernelCluster], ax
+	ret
+.oddCluster:
+	shr	ax, 4
+	mov	[kernelCluster], ax
+	ret
+
+;;;;;
+; Read sector
+; ax	-	LBA
+; es:bx	-	destination
+;;;;;
+ReadSector:
+	push	bx
+	; LBA 2 CHS
+	mov	bl, [sectorsPerTrack]
+	div	bl
+
+	mov	cl, ah ; Sectors
+	inc	cl
+	xor	ah, ah
+
+	mov	bl, [headsCount]
+	div	bl
+
+	mov	dh, ah ; Heads
+	mov	ch, al ; Cylinders
+
+	;;;;;
+	mov	ah, 02h
+	mov	al, 1
+	mov	dl, [driveNumber]
+	pop	bx
+
+	int	13h
+	jc	Fail
+	ret
+
+;;;;; Padding
 times 510 - ($ - $$) db 0
 dw 0xAA55

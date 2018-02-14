@@ -148,8 +148,9 @@ Memory_InitOld:
 ;
 %define Memory_Alloc Memory_AllocBytes
 Memory_AllocBytes:
-	push	bp
-	mov	bp, sp
+	rpush	bp
+	;push	bp
+	;mov	bp, sp
 
 	mov	ax, [bp+4]
 	add	ax, 15
@@ -158,7 +159,8 @@ Memory_AllocBytes:
 	call	Memory_AllocSegments
 	add	sp, 2
 
-	pop	bp
+	;pop	bp
+	rpop
 	ret
 
 ;;;;;
@@ -166,14 +168,15 @@ Memory_AllocBytes:
 ; (bp+4) - (word) size in segments (bytes / 16)
 ;
 Memory_AllocSegments:
-	push	bp
-	mov	bp, sp
+	rpush	bp, bx, cx, es, fs, gs
+	;push	bp
+	;mov	bp, sp
 
-	push	bx
-	push	cx
-	push	es
-	push	fs
-	push	gs
+	;push	bx
+	;push	cx
+	;push	es
+	;push	fs
+	;push	gs
 
 	mov	cx, [bp+4]
 	inc	cx ; cx = size+1, 1 segment more to save size
@@ -233,13 +236,13 @@ Memory_AllocSegments:
 	inc	ax
 
 .ret:
-	pop	gs
-	pop	fs
-	pop	es
-	pop	cx
-	pop	bx
-	pop	bp
-	xchg	bx, bx
+	rpop
+	;pop	gs
+	;pop	fs
+	;pop	es
+	;pop	cx
+	;pop	bx
+	;pop	bp
 	ret
 .fail:
 	push	.nomem
@@ -258,13 +261,14 @@ Memory_AllocSegments:
 ; (bp+4) - segment to free
 ;
 Memory_Free:
-	push	bp
-	mov	bp, sp
-	push	bx
-	push	si
-	push	es
-	push	fs
-	push	gs
+	rpush	bp, bx, si, es, fs, gs
+	;push	bp
+	;mov	bp, sp
+	;push	bx
+	;push	si
+	;push	es
+	;push	fs
+	;push	gs
 
 	; debug
 	mov	bx, [bp+4]
@@ -358,12 +362,13 @@ Memory_Free:
 
 	call	Memory_Merge
 
-	pop	gs
-	pop	fs
-	pop	es
-	pop	si
-	pop	bx
-	pop	bp
+	rpop
+	;pop	gs
+	;pop	fs
+	;pop	es
+	;pop	si
+	;pop	bx
+	;pop	bp
 	ret
 .info db 'Freeing %u segments',0xA,0
 .firstStr db 'First',0xA,0
@@ -372,10 +377,7 @@ Memory_Free:
 .curStr db 'Current first block: %x',0xA,0
 
 Memory_Merge:
-	push	bx
-	push	es
-	push	fs
-	push	gs
+	rpush	bx, es, fs, gs
 
 	; es - current segment
 	; fs - prev segment
@@ -414,15 +416,11 @@ Memory_Merge:
 
 	jmp	.loop
 .ret:
-	pop	gs
-	pop	fs
-	pop	es
-	pop	bx
+	rpop
 	ret
 
 Memory_GetFree:
-	push	bx
-	push	es
+	rpush	bx, es
 
 	mov	ax, 0
 	cmp	word [memBlock], 0
@@ -439,16 +437,13 @@ Memory_GetFree:
 	jmp	.loop
 
 .ret:
-	pop	es
-	pop	bx
+	rpop
 	ret
 
 ;;;;;
 ;
 Memory_PrintMap:
-	push	ax
-	push	bx
-	push	es
+	rpush	ax, bx, es
 
 	push	.map
 	call	printf
@@ -475,9 +470,7 @@ Memory_PrintMap:
 	jmp	.loop
 
 .ret:
-	pop	es
-	pop	bx
-	pop	ax
+	rpop
 	ret
 .map db 'Memory map:',0xA,0
 .info db 0x9,'Block at %x - %ukB',0xA,0

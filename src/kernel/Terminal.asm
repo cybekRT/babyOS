@@ -40,16 +40,13 @@ Terminal_Init:
 
 	ret
 
-.hello db 'babyOS v0.1',0xA,0
+.hello db OS_NAME,0xA,0xA,'Terminal initialized!',0xA,0
+;'babyOS v0.1'
 
 ; Text: [ds:bp+4]
 ; NULL-terminated
 Terminal_Write:
-	push	bp
-	mov	bp, sp
-
-	push	ax
-	push	si
+	rpush	bp, si
 
 	mov	si, [bp+4]
 .write_loop:
@@ -63,16 +60,12 @@ Terminal_Write:
 	jmp	.write_loop
 
 .ret:
-	pop	si
-	pop	ax
-	pop	bp
+	rpop
 	ret
 
 ; al - character
 Terminal_Put:
-	push	ax
-	push	bx
-	push	es
+	rpush	bx, es
 
 	; Line feed
 	cmp	al, 0xA
@@ -96,9 +89,7 @@ Terminal_Put:
 	call	Terminal_Scroll
 
 .ret:
-	pop	es
-	pop	bx
-	pop	ax
+	rpop
 	ret
 .lf:
 	call	Terminal_LineFeed
@@ -111,9 +102,7 @@ Terminal_Put:
 	jmp	.ret
 
 Terminal_LineFeed:
-	push	ax
-	push	bx
-	push	dx
+	rpush	bx, dx
 
 	mov	bx, 80*2
 	mov	dx, 0
@@ -128,15 +117,11 @@ Terminal_LineFeed:
 	call	Terminal_Scroll
 
 .ret:
-	pop	dx
-	pop	bx
-	pop	ax
+	rpop
 	ret
 
 Terminal_CarriageReturn:
-	push	ax
-	push	bx
-	push	dx
+	rpush	bx,  dx
 
 	mov	bx, 80*2
 	mov	dx, 0
@@ -145,15 +130,11 @@ Terminal_CarriageReturn:
 
 	sub	word [cs:terminalPos], dx
 
-	pop	dx
-	pop	bx
-	pop	ax
+	rpop
 	ret
 
 Terminal_Tab:
-	push	ax
-	push	bx
-	push	dx
+	rpush	bx, dx
 
 	mov	bx, TAB_WIDTH*2
 	mov	dx, 0
@@ -168,22 +149,12 @@ Terminal_Tab:
 	call	Terminal_Scroll
 
 .ret:
-	pop	dx
-	pop	bx
-	pop	ax
-	ret
-
+	rpop
 	ret
 
 Terminal_Scroll:
+	rpush	cx, si, di, ds, es
 	mov	word [cs:terminalPos], 80*24*2
-
-	push	ax
-	push	cx
-	push	si
-	push	di
-	push	ds
-	push	es
 
 	; ds:si -> es:di
 	mov	si, 0xb800
@@ -202,13 +173,7 @@ Terminal_Scroll:
 
 	mov	word [cs:terminalPos], 80*24*2
 
-	pop	es
-	pop	ds
-	pop	di
-	pop	si
-	pop	cx
-	pop	ax
-
+	rpop
 	ret
 
 ;
@@ -223,14 +188,7 @@ Terminal_Scroll:
 ;
 %define printf Terminal_Print
 Terminal_Print:
-	push	bp
-	mov	bp, sp
-	push	ax
-	push	bx
-	push	cx
-	push	dx
-	push	si
-	push	di
+	rpush	bp, bx, cx, dx, si, di
 
 	mov	si, [bp+4]
 	mov	di, bp
@@ -268,6 +226,12 @@ Terminal_Print:
 	; %X
 	cmp	al, 'X'
 	je	.spec_xx
+	; %b
+	cmp	al, 'b'
+	je	.spec_b
+	; %c
+	cmp	al, 'c'
+	je	.spec_c
 	; %%
 	cmp	al, '%'
 	je	.spec_proc
@@ -383,6 +347,39 @@ Terminal_Print:
 	jmp	.loop
 ;;;;; %p %x ;;;;;
 
+.spec_b:
+	mov	ax, [ss:di]
+	add	di, 2
+
+	push	cx
+	mov	cx, 16
+.spec_b_loop:
+	push	ax
+	xor	al, al
+	test	ah, 1<<7
+	jz	.spec_b_zero
+.spec_b_one:
+	inc	al
+.spec_b_zero:
+	add	al, '0'
+	call	Terminal_Put
+
+	pop	ax
+	shl	ax, 1
+	loop	.spec_b_loop
+
+	pop	cx
+	inc	si
+	jmp	.loop
+
+.spec_c:
+	mov	ax, [ss:di]
+	add	di, 2
+
+	call	Terminal_Put
+	inc	si
+	jmp	.loop
+
 .spec_proc:
 	call	Terminal_Put
 	inc	si
@@ -394,13 +391,7 @@ Terminal_Print:
 	jmp	.loop
 
 .ret:
-	pop	di
-	pop	si
-	pop	dx
-	pop	cx
-	pop	bx
-	pop	ax
-	pop	bp
+	rpop
 	ret
 
 .buffer times 7 db 0

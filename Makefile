@@ -1,4 +1,3 @@
-
 ifeq ($(OS),Windows_NT)
 	NASM		= D:\Programs\Nasm\nasm
 	DOS_IMG		= D:\Programs\Qemu\dos.img
@@ -14,6 +13,7 @@ else
 	BOCHS		= bochs
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
 	FLOPPY		= utils\babyFloppy\babyFloppy
+	CFS		= ~/Workspace/Eclipse/cFS-cli/Debug/cFS-cli
 endif
 
 SRC_DIR		= src
@@ -27,8 +27,14 @@ BOCHS_FLAGS	= -f bochs.cfg -q
 all: image
 
 image: out/floppy.img
-out/floppy.img: out/boot.bin out/kernel.bin
-	cat out/boot.bin out/kernel.bin > out/floppy.img
+
+# FAT12 floppy
+out/floppy.img: src/floppy.json out/boot.bin out/kernel.bin
+	$(CFS) src/floppy.json > /dev/null
+
+# Raw floppy
+#out/floppy.img: out/boot.bin out/kernel.bin
+#	cat out/boot.bin out/kernel.bin > out/floppy.img
 
 boot: out/boot.bin
 out/boot.bin: src/boot/* out/kernel.bin
@@ -43,6 +49,9 @@ clean:
 
 qemu: image
 	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -monitor stdio
+
+qemu-debug: image
+	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -s -S
 
 bochs: image
 	$(BOCHS) $(BOCHS_FLAGS)

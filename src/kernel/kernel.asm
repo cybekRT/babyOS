@@ -1,19 +1,19 @@
 [bits 16]
 [org 0x500]
 [CPU 386]
+
 KERNEL_BEGIN:
 	jmp	init
 
+%include "../global.asm"
 %include "Terminal.asm"
 %include "Memory.asm"
+;%include "Fat12.asm"
+%include "Keyboard.asm"
 
 init:
-	mov	bx, 0
-	mov	gs, bx
-
-	; 
 	cli
-	mov	bx, cs
+	mov	bx, 0;cs
 	mov	ds, bx
 	mov	es, bx
 	mov	ss, bx
@@ -27,6 +27,23 @@ init:
 	call	Memory_AllocBytes
 	mov	ss, ax
 	mov	sp, 2048
+
+	; Init FAT12
+	;call	FAT12_Init
+
+	; Keyboard
+	call	Keyboard_Init
+
+	sti
+.test:
+	hlt
+	call	Keyboard_GetBufferLength
+	push	ax
+	push	.bufsizestr
+	call	printf
+	add	sp, 4
+	jmp	.test
+.bufsizestr db 'Buffer: %d, ',0
 
 	call	Panic
 
