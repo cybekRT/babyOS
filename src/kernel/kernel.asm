@@ -38,12 +38,20 @@ init:
 .test:
 	hlt
 	call	Keyboard_GetBufferLength
+	cmp	ax, 0
+	jz	.test
+
+	mov	bx, ax
+	call	Keyboard_GetChar
+	jc	.test
 	push	ax
-	push	.bufsizestr
+	push	bx
+	push	.buff
 	call	printf
-	add	sp, 4
+	add	sp, 6
 	jmp	.test
-.bufsizestr db 'Buffer: %d, ',0
+.bufsizestr db 'Buffer: %d  ', 0xD,0
+.buff db "Buffer %d, %c",0xA,0
 
 	call	Panic
 

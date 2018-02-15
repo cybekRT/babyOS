@@ -20,19 +20,20 @@ Keyboard_Handler:
 
 	mov	al, [kbdBufferBeg]
 	mov	ah, [kbdBufferEnd]
-	inc	al
+	inc	ah
+	and	ah, (kbdBufferSize - 1)
 	cmp	al, ah
-	;je	.notEnoughMemory
+	je	.notEnoughMemory
 
 	in	al, 0x60
 	test	al, 0x80
 	jne	.keyReleased
 
-	mov	bx, kbdBuffer
-	add	bx, [kbdBufferEnd]
+	movzx	bx, byte [kbdBufferEnd]
+	add	bx, kbdBuffer
 	mov	[bx], al
 	inc	byte [kbdBufferEnd]
-	and	byte [kbdBufferEnd], 0x0f
+	and	byte [kbdBufferEnd], (kbdBufferSize - 1)
 
 .keyReleased:
 .notEnoughMemory:
@@ -44,34 +45,36 @@ Keyboard_Handler:
 	iret
 
 Keyboard_GetChar:
-	mov	ax, 0
-	ret
-
 	rpush	bx
 
 	mov	al, [kbdBufferBeg]
 	mov	ah, [kbdBufferEnd]
 	je	.bufferEmpty
 
-	mov	bx, kbdBuffer
-	add	bx, [kbdBufferBeg]
+	movzx	bx, byte [kbdBufferBeg]
+	add	bx, kbdBuffer
 	mov	al, [bx]
 
 	inc	byte [kbdBufferBeg]
-	and	byte [kbdBufferBeg], 0x0f
+	and	byte [kbdBufferBeg], (kbdBufferSize - 1)
 
-.bufferEmpty:
+.ret:
 	xor	ah, ah
 	rpop
 	ret
+.bufferEmpty:
+	stc
+	;mov	ax, 0
+	jmp	.ret
 
 Keyboard_GetBufferLength:
 	xor	ah, ah
 	mov	al, [kbdBufferEnd]
 	sub	al, [kbdBufferBeg]
-	and	ax, 0x0f
+	and	ax, (kbdBufferSize - 1)
 	ret
 
-kbdBuffer times 16 db 0
 kbdBufferBeg db 0
 kbdBufferEnd db 0
+kbdBuffer times 8 db 0
+kbdBufferSize equ ($ - kbdBuffer) ; Must be power of two
