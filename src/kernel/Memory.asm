@@ -4,6 +4,13 @@
 ;	[memBlockPos + 2] -> nextBlockPos, 0 if last entry
 ;
 
+InterruptInfo Memory_Init, Memory_GetFree, Memory_AllocSegments, Memory_AllocBytes, Memory_Free, Memory_PrintMap
+API_MEMORY_GET_FREE		equ 0
+API_MEMORY_ALLOC_SEGMENTS	equ 1
+API_MEMORY_ALLOC_BYTES		equ 2
+API_MEMORY_FREE			equ 3
+API_MEMORY_PRINT_MAP		equ 4
+
 struc MemBlock
 	.size resw 1
 	.next resw 1
@@ -108,6 +115,8 @@ Memory_Init:
 ;
 ;
 Memory_InitOld:
+	InstallInterrupt	INT_API_MEMORY
+
 	int	0x12
 	jc	.no_memory
 	; ax = ram size in kb
@@ -142,43 +151,37 @@ Memory_InitOld:
 .memInfoStr db 'First block: %x, size: %x',0xA,0
 .hello db 'Memory manager initialized!',0xA,0
 
-;;;;;
-;
-; (bp+4) - size in bytes
-;
-%define Memory_Alloc Memory_AllocBytes
+;;;;;;;;;;
+; (bp+8) - size in bytes
+;;;;;;;;;;
 Memory_AllocBytes:
-	rpush	bp
-	;push	bp
-	;mov	bp, sp
+	push	bp
+	mov	bp, sp
+	add	word [bp+8], 15
+	shr	word [bp+8], 4
+	pop	bp
 
-	mov	ax, [bp+4]
+	jmp	Memory_AllocSegments
+
+	rpush	bp
+
+	mov	ax, [bp+8]
 	add	ax, 15
 	shr	ax, 4
 	push	ax
 	call	Memory_AllocSegments
 	add	sp, 2
 
-	;pop	bp
 	rpop
-	ret
+	iret
 
-;;;;;
-;
-; (bp+4) - (word) size in segments (bytes / 16)
-;
+;;;;;;;;;;
+; (bp+8) - (word) size in segments (bytes / 16)
+;;;;;;;;;;
 Memory_AllocSegments:
 	rpush	bp, bx, cx, es, fs, gs
-	;push	bp
-	;mov	bp, sp
 
-	;push	bx
-	;push	cx
-	;push	es
-	;push	fs
-	;push	gs
-
-	mov	cx, [bp+4]
+	mov	cx, [bp+8]
 	inc	cx ; cx = size+1, 1 segment more to save size
 
 	; debug
@@ -243,7 +246,7 @@ Memory_AllocSegments:
 	;pop	cx
 	;pop	bx
 	;pop	bp
-	ret
+	iret
 .fail:
 	push	.nomem
 	call	printf
@@ -252,26 +255,19 @@ Memory_AllocSegments:
 	call	Panic
 
 	mov	ax, 0
-	ret
+	iret
 .info db 'Allocating %u segments',0xA,0
 .nomem db 'Not enough free memory!',0xA,0
 
 ;;;;;
 ;
-; (bp+4) - segment to free
+; (bp+8) - segment to free
 ;
 Memory_Free:
 	rpush	bp, bx, si, es, fs, gs
-	;push	bp
-	;mov	bp, sp
-	;push	bx
-	;push	si
-	;push	es
-	;push	fs
-	;push	gs
 
 	; debug
-	mov	bx, [bp+4]
+	mov	bx, [bp+8]
 	dec	bx
 	mov	es, bx
 	push	word [es:MemBlock.size]
@@ -363,13 +359,7 @@ Memory_Free:
 	call	Memory_Merge
 
 	rpop
-	;pop	gs
-	;pop	fs
-	;pop	es
-	;pop	si
-	;pop	bx
-	;pop	bp
-	ret
+	iret
 .info db 'Freeing %u segments',0xA,0
 .firstStr db 'First',0xA,0
 .betweenStr db 'Between',0xA,0
@@ -438,7 +428,7 @@ Memory_GetFree:
 
 .ret:
 	rpop
-	ret
+	iret
 
 ;;;;;
 ;

@@ -5,11 +5,12 @@
 KERNEL_BEGIN:
 	jmp	init
 
-%include "../global.asm"
+%include "../global.inc"
+%include "Interrupt.inc"
 %include "Terminal.asm"
 %include "Memory.asm"
-;%include "Fat12.asm"
-%include "Keyboard.asm"
+;%include "FAT12.asm"
+;%include "Keyboard.asm"
 
 init:
 	cli
@@ -24,7 +25,8 @@ init:
 
 	; Alloc memory for stack
 	push	2048
-	call	Memory_AllocBytes
+	;call	Memory_AllocBytes
+	ApiCall	INT_API_MEMORY, MEMORY_API_ALLOC_BYTES
 	mov	ss, ax
 	mov	sp, 2048
 
@@ -32,17 +34,17 @@ init:
 	;call	FAT12_Init
 
 	; Keyboard
-	call	Keyboard_Init
+	;call	Keyboard_Init
 
 	sti
 .test:
 	hlt
-	call	Keyboard_GetBufferLength
+	;call	Keyboard_GetBufferLength
 	cmp	ax, 0
 	jz	.test
 
 	mov	bx, ax
-	call	Keyboard_GetChar
+	;call	Keyboard_GetChar
 	jc	.test
 	push	ax
 	push	bx
@@ -93,5 +95,3 @@ panicMsg: db 0xA,'Kernel halted!',0xA,\
 stackEnd: times 64 db 0
 stackBegin:
 KERNEL_END equ $-$$ + 0x500
-
-;times 1474560 - ($-$$) - 512 db 0

@@ -1,25 +1,11 @@
 [bits 16]
 [org 0x7c00]
 [cpu 386]
-%include "../global.asm"
+%include "../global.inc"
+%include "../kernel/FAT12.inc"
 
 ; CHS
 ; 80, 2, 18
-
-;;;;; Structures
-struc DirectoryEntry
-	.name resb 8+3
-	.attributes resb 1
-	.reserved resb 2
-	.createTime resb 2
-	.createDate resb 2
-	.accessDate resb 2
-	.clusterHigh resb 2
-	.modificationTime resb 2
-	.modificationDate resb 2
-	.cluster resb 2
-	.size resb 4
-endstruc
 
 ;;;;; Code
 BPB:
@@ -88,22 +74,22 @@ SearchKernel:
 	call	ReadRoot
 .dontRead:
 	; Set current filename offset
-	mov	di, ROOT_LOC + DirectoryEntry.name
-	add	di, [rootOffset]
+	mov	si, ROOT_LOC + FAT12_DirectoryEntry.name
+	add	si, [rootOffset]
 	; Compare
 	mov	cx, 8+3
-	mov	si, FILENAME
+	mov	di, FILENAME
 	repe	cmpsb
 	je	ReadEntry
 
-	add	word [rootOffset], DirectoryEntry_size
+	add	word [rootOffset], FAT12_DirectoryEntry_size
 	cmp	word [rootOffset], 512
 	jne	SearchKernel
 	mov	word [rootOffset], 0
 	jmp	SearchKernel
 
 ReadEntry:
-	mov	bx, ROOT_LOC + DirectoryEntry.cluster
+	mov	bx, ROOT_LOC + FAT12_DirectoryEntry.cluster
 	add	bx, [rootOffset]
 	push	word [bx]
 	pop	word [kernelCluster]
@@ -122,8 +108,9 @@ Fail:
 	mov	bx, 0xb800
 	mov	es, bx
 	mov	bx, 0
-	mov	byte [es:bx+0], 'X'
+	mov	byte [es:bx+0], al
 	mov	byte [es:bx+2], ' '
+	jmp	$
 
 ; Boot other device...
 	int	0x18
@@ -131,6 +118,20 @@ Fail:
 ;;;;; Functions
 ReadRoot:
 	mov	al, [rootSectorEnd]
+	;sub	al, [rootSector]
+	;add	al, '0'
+	;mov	cl, [rootSector]
+	;add	cl, '0'
+
+	;mov	bx, 0xb800
+	;mov	es, bx
+	;mov	bx, 0
+
+	;mov	[es:bx+0], cl
+	;mov	[es:bx+2], al
+
+	;jmp	$
+
 	cmp	byte [rootSector], al
 	je	Fail
 
@@ -180,8 +181,6 @@ ReadKernel:
 ReadFAT:
 	mov	ax, [kernelCluster]
 	shr	ax, 9
-	;push	ax
-
 	cmp	ax, [fatSector]
 	je	.dontRead
 
@@ -250,5 +249,5 @@ ReadSector:
 	ret
 
 ;;;;; Padding
-times 510 - ($ - $$) db 0
+times 510 - ($ - $$) db 0x90
 dw 0xAA55

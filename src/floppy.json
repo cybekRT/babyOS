@@ -3,7 +3,9 @@
         "bootloader": "out/boot.bin",  
         "/": {
                 "kernel.bin": "out/kernel.bin",
-                "int": {}
+                "int": {
+                        "keyboard.int": "out/keyboard.int"
+                }
 	},
         "output": "out/floppy.img"
 }

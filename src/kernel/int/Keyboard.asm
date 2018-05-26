@@ -1,18 +1,31 @@
+%include "global.inc"
+%include "Interrupt.inc"
+
+InterruptInfo Keyboard_Init, Keyboard_GetBufferLength, Keyboard_GetChar
+
+;;;;;;;;;;
+; Interrupt installer
+;;;;;;;;;;
 Keyboard_Init:
 	rpush	bx, ds
 
 	; Install handler
-	mov	bx, 0
-	mov	ds, bx
+	InstallInterrupt	IRQ2INT(IRQ_KEYBOARD), Keyboard_IRQ_Handler
+	InstallInterrupt	INT_API_KEYBOARD
+	;mov	bx, 0
+	;mov	ds, bx
 
-	mov	bx, 9*4
-	mov	word [ds:bx+0], Keyboard_Handler
-	mov	word [ds:bx+2], 0
+	;mov	bx, 9*4
+	;mov	word [ds:bx+0], Keyboard_Handler
+	;mov	word [ds:bx+2], 0
 
 	rpop
 	ret
 
-Keyboard_Handler:
+;;;;;;;;;;
+; Interrupt handler
+;;;;;;;;;;
+Keyboard_IRQ_Handler:
 	rpush	ax, bx, ds
 	pushf
 	mov	bx, 0
@@ -35,8 +48,8 @@ Keyboard_Handler:
 	inc	byte [kbdBufferEnd]
 	and	byte [kbdBufferEnd], (kbdBufferSize - 1)
 
+.notEnoughMemory: ; TODO beep
 .keyReleased:
-.notEnoughMemory:
 	mov	al, 0x20
 	out	0x20, al
 
@@ -44,6 +57,11 @@ Keyboard_Handler:
 	rpop
 	iret
 
+;;;;;;;;;;
+; Get character
+; Return:
+;	al	-	scancode
+;;;;;;;;;;
 Keyboard_GetChar:
 	rpush	bx
 
@@ -67,6 +85,11 @@ Keyboard_GetChar:
 	;mov	ax, 0
 	jmp	.ret
 
+;;;;;;;;;;
+; Get characters in buffer
+; Return:
+;	ax	-	characters in buffer
+;;;;;;;;;;
 Keyboard_GetBufferLength:
 	xor	ah, ah
 	mov	al, [kbdBufferEnd]
