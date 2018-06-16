@@ -113,6 +113,6 @@ INT_API_MEMORY		equ 0x80
 INT_API_KEYBOARD	equ 0x81
 
 %macro ApiCall 2
-	mov	ah, %0
+	mov	ah, %2
 	int	%1
 %endmacro
