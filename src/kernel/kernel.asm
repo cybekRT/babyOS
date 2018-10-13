@@ -9,8 +9,10 @@ KERNEL_BEGIN:
 %include "Interrupt.inc"
 %include "Terminal.asm"
 %include "Memory.asm"
-;%include "FAT12.asm"
+%include "FAT12.asm"
 ;%include "Keyboard.asm"
+
+hdir dw 0
 
 init:
 	cli
@@ -26,17 +28,29 @@ init:
 	; Alloc memory for stack
 	push	2048
 	;call	Memory_AllocBytes
-	ApiCall	INT_API_MEMORY, MEMORY_API_ALLOC_BYTES
+	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
 	mov	ss, ax
 	mov	sp, 2048
 
 	; Init FAT12
-	;call	FAT12_Init
+	call	FAT12_Init
+	call	FAT12_OpenRoot
+	mov	[hdir], ax
+
+	push	word [hdir]
+	call	FAT12_CloseDirectory
+	add	sp, 2
 
 	; Keyboard
 	;call	Keyboard_Init
 
-	sti
+	;sti
+
+halt:
+	;cli
+	;hlt
+	;jmp	halt
+	call	Panic
 .test:
 	hlt
 	;call	Keyboard_GetBufferLength
@@ -58,7 +72,7 @@ init:
 	call	Panic
 
 Panic:
-	call	Memory_PrintMap
+	;call	Memory_PrintMap
 
 	; [bp] - ip
 	mov	bp, sp
@@ -79,6 +93,8 @@ Panic:
 	push	panicMsg
 	call	printf
 
+	call	Memory_PrintMap
+
 	cli
 	hlt
 	jmp	Panic
@@ -90,7 +106,7 @@ panicMsg: db 0xA,'Kernel halted!',0xA,\
 	'	SI: %x	DI: %x',0xA,\
 	'	SS: %x	SP: %x',0xA,\
 	'	DS: %x	ES: %x',0xA,\
-	'	CS: %x	IP: %x'
+	'	CS: %x	IP: %x',0xA,0
 
 stackEnd: times 64 db 0
 stackBegin:

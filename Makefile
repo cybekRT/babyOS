@@ -6,14 +6,14 @@ ifeq ($(OS),Windows_NT)
 	PCEM		=
 	FLOPPY		= utils\babyFloppy\babyFloppy.exe
 else
-#	NASM		= nasm
-	NASM		= ~/Downloads/nasm-2.13.01/nasm
+	NASM		= nasm
+#	NASM		= ~/Downloads/nasm-2.13.01/nasm
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
 	BOCHS		= bochs
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
 	FLOPPY		= utils\babyFloppy\babyFloppy
-	CFS		= ~/Workspace/Eclipse/cFS-cli/Debug/cFS-cli
+	CFS		= ~/Workspace/cFS-cli/Debug/cFS-cli
 	PHP		= /usr/local/bin/php
 endif
 
@@ -39,7 +39,8 @@ out/floppy.img: src/floppy.json boot kernel
 
 boot: out/boot.bin
 out/boot.bin: src/boot/* out/kernel.bin
-	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ -DKERNEL_SIZE=$(shell stat -f"%z" out/kernel.bin) $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
+	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
+#	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ -DKERNEL_SIZE=$(shell stat -f"%z" out/kernel.bin) $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
 
 kernel: out/kernel.bin int
 out/kernel.bin: src/kernel/*

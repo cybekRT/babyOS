@@ -103,6 +103,7 @@ Memory_Init:
 	push	.hello
 	call	printf
 	add	sp, 2
+
 	ret
 ; .no_memory:
 ; 	push	.nomem
@@ -140,6 +141,8 @@ Memory_InitOld:
 	call	printf
 	add	sp, 2
 
+	call	Memory_PrintMap
+
 	ret
 .no_memory:
 	push	.nomem
@@ -157,6 +160,12 @@ Memory_InitOld:
 Memory_AllocBytes:
 	push	bp
 	mov	bp, sp
+
+	push	word [bp + 8]
+	push	.info
+	call	printf
+	add	sp, 4
+
 	add	word [bp+8], 15
 	shr	word [bp+8], 4
 	pop	bp
@@ -174,6 +183,7 @@ Memory_AllocBytes:
 
 	rpop
 	iret
+.info db 'Allocating %u bytes -> ',0,0xA,0
 
 ;;;;;;;;;;
 ; (bp+8) - (word) size in segments (bytes / 16)
@@ -239,6 +249,15 @@ Memory_AllocSegments:
 	inc	ax
 
 .ret:
+	push	ax
+	push	.mem
+	call	printf
+	add	sp, 2
+
+	;call	Memory_PrintMap
+
+	pop	ax
+
 	rpop
 	;pop	gs
 	;pop	fs
@@ -256,13 +275,16 @@ Memory_AllocSegments:
 
 	mov	ax, 0
 	iret
-.info db 'Allocating %u segments',0xA,0
+.info db 'Allocating %u segments: ',0;0xA,0
 .nomem db 'Not enough free memory!',0xA,0
+;.mem db 'OK %x',0xA,0
+.mem db '%x',0xA,0
 
+; TODO: fs, gs mustn't be used in 16-bit mode, only qemu allows it...
+; FIXME: is it working correctly!?
 ;;;;;
-;
 ; (bp+8) - segment to free
-;
+;;;;;;
 Memory_Free:
 	rpush	bp, bx, si, es, fs, gs
 
@@ -275,7 +297,7 @@ Memory_Free:
 	call	printf
 	add	sp, 4
 
-	mov	si, [bp+4]
+	mov	si, [bp+8]
 	dec	si
 
 	; es - current segment
@@ -315,9 +337,9 @@ Memory_Free:
 	jmp	.loop
 
 .xchg_between:
-	push	.betweenStr
-	call	printf
-	add	sp, 2
+	;push	.betweenStr
+	;call	printf
+	;add	sp, 2
 
 	mov	bx, si
 
@@ -328,9 +350,9 @@ Memory_Free:
 	jmp	.ret
 
 .xchg_first:
-	push	.firstStr
-	call	printf
-	add	sp, 2
+	;push	.firstStr
+	;call	printf
+	;add	sp, 2
 
 	mov	bx, [memBlock]
 	mov	es, si
@@ -340,9 +362,9 @@ Memory_Free:
 	jmp	.ret
 
 .xchg_last:
-	push	.lastStr
-	call	printf
-	add	sp, 2
+	;push	.lastStr
+	;call	printf
+	;add	sp, 2
 
 	mov	[es:MemBlock.next], si
 	mov	gs, si
@@ -361,9 +383,9 @@ Memory_Free:
 	rpop
 	iret
 .info db 'Freeing %u segments',0xA,0
-.firstStr db 'First',0xA,0
-.betweenStr db 'Between',0xA,0
-.lastStr db 'Last',0xA,0
+;.firstStr db 'First',0xA,0
+;.betweenStr db 'Between',0xA,0
+;.lastStr db 'Last',0xA,0
 .curStr db 'Current first block: %x',0xA,0
 
 Memory_Merge:

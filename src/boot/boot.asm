@@ -15,7 +15,7 @@ BPB:
 	oem			db 'MSDOS5.0'
 	bytesPerSector		dw 512
 	sectorsPerCluster	db 1
-	reservedSectors		dw ((KERNEL_SIZE + 511) / 512)
+	reservedSectors		dw 1 ;((KERNEL_SIZE + 511) / 512)
 	fatsCount		db 2
 	rootEntries		dw 224
 	totalSectors		dw 2880
@@ -31,7 +31,7 @@ EBR:
 	signature		db 0x28
 	volumeId		db '1234'
 	label			db OS_NAME
-	systemId		db 'VMVMVMVM'
+	systemId		db ' babyOS '
 
 bootcode:
 	mov	[driveNumber], dl

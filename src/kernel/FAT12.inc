@@ -44,18 +44,19 @@ struc FAT12_DirectoryEntry
 	.size			resb 4
 endstruc
 
-struc FAT12_Handle
-	.driveNumber	resb 1
-	.bpbPtr		resb 2
-	.fatPtr		resb 2
-	.bufferPtr	resb 2
-endstruc
+;struc FAT12_Handle
+;	.driveNumber	resb 1
+;	.bpbPtr		resb 2
+;	.fatPtr		resb 2
+;	.bufferPtr	resb 2
+;endstruc
 
 struc FAT12_Directory
 	.firstCluster	resb 2
 	.currentCluster	resb 2
 	.currentOffset	resb 2
-	.bufferPtr	resb 2
+	.align		resb 10
+	.buffer		resb 512
 endstruc
 
 FAT12_ATTR_ReadOnly		equ 0b1

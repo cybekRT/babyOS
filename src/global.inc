@@ -12,7 +12,7 @@
 		%endif
 		%rotate 1
 	%endrep
-	jmp	%$ok
+	jmp	short %$ok
 %$pop:
 	%rep %0
 		%rotate -1
