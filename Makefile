@@ -1,9 +1,11 @@
 ifeq ($(OS),Windows_NT)
-	NASM		= D:\Programs\Nasm\nasm
+#	NASM		= D:\Programs\Nasm\nasm
+	NASM		= nasm
 	DOS_IMG		= D:\Programs\Qemu\dos.img
-	QEMU		= D:\Programs\Qemu\qemu
+	QEMU		= D:\Programs\Qemu\qemu-system-i386
 	BOCHS		= bochs
 	PCEM		=
+	CFS			= D:/Workspace/cFS/cFS-cli/Debug/cFS-cli.exe
 	FLOPPY		= utils\babyFloppy\babyFloppy.exe
 else
 	NASM		= nasm
@@ -53,7 +55,9 @@ int: src/kernel/int/*.asm
 doc: int_doc
 
 int_doc: int
-	$(PHP) src/doc.php > out/babyOS.html
+
+#int_doc: int
+#	$(PHP) src/doc.php > out/babyOS.html
 
 clean:
 	rm -rf out/boot.bin out/kernel.bin out/floppy.img out/*.int || true
