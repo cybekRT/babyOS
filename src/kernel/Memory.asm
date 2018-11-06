@@ -281,6 +281,7 @@ Memory_AllocSegments:
 .mem db '%x',0xA,0
 
 ; TODO: fs, gs mustn't be used in 16-bit mode, only qemu allows it...
+;       oh, they can be... at least PCem allows it, huh. Error was somewhere else :|
 ; FIXME: is it working correctly!?
 ;;;;;
 ; (bp+8) - segment to free

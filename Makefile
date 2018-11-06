@@ -1,21 +1,17 @@
 ifeq ($(OS),Windows_NT)
-#	NASM		= D:\Programs\Nasm\nasm
 	NASM		= nasm
 	DOS_IMG		= D:\Programs\Qemu\dos.img
 	QEMU		= D:\Programs\Qemu\qemu-system-i386
 	BOCHS		= bochs
 	PCEM		=
-	CFS			= D:/Workspace/cFS/cFS-cli/Debug/cFS-cli.exe
-	FLOPPY		= utils\babyFloppy\babyFloppy.exe
+	CFS		= ../cFS/cFS-cli/Debug/cFS-cli.exe
 else
 	NASM		= nasm
-#	NASM		= ~/Downloads/nasm-2.13.01/nasm
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
 	BOCHS		= bochs
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
-	FLOPPY		= utils\babyFloppy\babyFloppy
-	CFS		= ~/Workspace/cFS-cli/Debug/cFS-cli
+	CFS		= ../cFS/cFS-cli/Debug/cFS-cli
 	PHP		= /usr/local/bin/php
 endif
 

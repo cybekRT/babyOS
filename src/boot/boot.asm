@@ -52,10 +52,19 @@ fatSector dw 0xFFFF
 ;;;;;
 
 Init:
+	; CS set to 0x0 with jump, but DS also needs to be set to 0x0...
+	mov	bx, 0
+	mov	ds, bx
+
+	; Clear screen
+	mov	ax, 3
+	int	10h
+
 	; Calculate last root sector
 	mov	ax, [rootEntries]
 	shr	ax, 4
 	mov	[rootSectorEnd], al
+
 	; Calculate first root sector
 	mov	al, [sectorsPerFat]
 	mov	ah, [fatsCount]
@@ -108,7 +117,7 @@ Fail:
 	mov	bx, 0xb800
 	mov	es, bx
 	mov	bx, 0
-	mov	byte [es:bx+0], al
+	mov	byte [es:bx+0], 'F'
 	mov	byte [es:bx+2], ' '
 	jmp	$
 
@@ -118,19 +127,6 @@ Fail:
 ;;;;; Functions
 ReadRoot:
 	mov	al, [rootSectorEnd]
-	;sub	al, [rootSector]
-	;add	al, '0'
-	;mov	cl, [rootSector]
-	;add	cl, '0'
-
-	;mov	bx, 0xb800
-	;mov	es, bx
-	;mov	bx, 0
-
-	;mov	[es:bx+0], cl
-	;mov	[es:bx+2], al
-
-	;jmp	$
 
 	cmp	byte [rootSector], al
 	je	Fail
