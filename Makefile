@@ -12,7 +12,7 @@ else
 	BOCHS		= bochs
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
 	CFS		= ../cFS/cFS-cli/Debug/cFS-cli
-	PHP		= /usr/local/bin/php
+	PHP		= php
 endif
 
 SRC_DIR		= src
@@ -27,20 +27,17 @@ all: image doc
 
 image: out/floppy.img
 
-# FAT12 floppy
+# Floppy image
 out/floppy.img: src/floppy.json boot kernel
 	$(CFS) src/floppy.json > /dev/null
 
-# Raw floppy
-#out/floppy.img: out/boot.bin out/kernel.bin
-#	cat out/boot.bin out/kernel.bin > out/floppy.img
-
-boot: out/boot.bin
+# Bootloader
+boot: dirs out/boot.bin
 out/boot.bin: src/boot/* out/kernel.bin
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
-#	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ -DKERNEL_SIZE=$(shell stat -f"%z" out/kernel.bin) $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
 
-kernel: out/kernel.bin int
+# Kernel
+kernel: dirs out/kernel.bin int
 out/kernel.bin: src/kernel/*
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/kernel.lst -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $(OUT_DIR)/kernel.bin
 
@@ -48,16 +45,17 @@ out/kernel.bin: src/kernel/*
 int: src/kernel/int/*.asm
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $(OUT_DIR)/$(shell basename $< .asm).int
 
+# Documentation
 doc: int_doc
 
 int_doc: int
-
-#int_doc: int
-#	$(PHP) src/doc.php > out/babyOS.html
+	$(PHP) src/doc.php > out/babyOS.html
 
 clean:
-	rm -rf out/boot.bin out/kernel.bin out/floppy.img out/*.int || true
+	rm out/boot.bin out/kernel.bin out/floppy.img out/*.int out/babyOS.html lst/*.lst 2> /dev/null || true
+	rmdir out lst 2> /dev/null || true
 
+# Emulators
 qemu: image
 	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -monitor stdio
 
@@ -70,7 +68,11 @@ bochs: image
 pcem: image
 	$(PCEM) 2>/dev/null
 
-.PHONY: all image boot kernel int clean
+# Directories
+dirs:
+	mkdir $(OUT_DIR) $(LST_DIR) 2> /dev/null || true
+
+.PHONY: all image boot kernel int clean dirs out lst
 
 # grep -e InstallInterrupt -e InterruptInfo --no-filename `find src/kernel -name *.asm`
 # grep -e InterruptInfo --no-filename `find src/kernel -name *.asm` | cut -d' ' -f 3- | sed -En 's/([a-zA-Z])+/\1/'
