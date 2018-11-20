@@ -42,11 +42,14 @@ out/kernel.bin: src/kernel/*
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/kernel.lst -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $(OUT_DIR)/kernel.bin
 
 # Interrupts
-int: src/kernel/int/*.asm
+INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
+int: dirs ${addprefix out/, ${notdir ${basename ${INT_FILES}}}.int}
+
+out/%.int: src/kernel/int/%.asm
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $(OUT_DIR)/$(shell basename $< .asm).int
 
 # Documentation
-doc: int_doc
+doc: dirs int_doc
 
 int_doc: int
 	$(PHP) src/doc.php > out/babyOS.html
@@ -69,10 +72,13 @@ pcem: image
 	$(PCEM) 2>/dev/null
 
 # Directories
-dirs:
-	mkdir $(OUT_DIR) $(LST_DIR) 2> /dev/null || true
+dirs: out lst
+out:
+	mkdir $(OUT_DIR) 2> /dev/null || true
+lst:
+	mkdir $(LST_DIR) 2> /dev/null || true
 
-.PHONY: all image boot kernel int clean dirs out lst
+.PHONY: all image boot kernel int clean dirs
 
 # grep -e InstallInterrupt -e InterruptInfo --no-filename `find src/kernel -name *.asm`
 # grep -e InterruptInfo --no-filename `find src/kernel -name *.asm` | cut -d' ' -f 3- | sed -En 's/([a-zA-Z])+/\1/'
