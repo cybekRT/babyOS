@@ -1,18 +1,16 @@
+NASM		= nasm
+BOCHS		= bochs
+PHP		= php
+CFS		= ../cFS/cFS-cli/Debug/cFS-cli
+
 ifeq ($(OS),Windows_NT)
-	NASM		= nasm
-	DOS_IMG		= D:\Programs\Qemu\dos.img
 	QEMU		= D:\Programs\Qemu\qemu-system-i386
-	BOCHS		= bochs
+	DOS_IMG		= D:\Programs\Qemu\dos.img
 	PCEM		=
-	CFS		= ../cFS/cFS-cli/Debug/cFS-cli.exe
 else
-	NASM		= nasm
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
-	BOCHS		= bochs
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
-	CFS		= ../cFS/cFS-cli/Debug/cFS-cli
-	PHP		= php
 endif
 
 SRC_DIR		= src
