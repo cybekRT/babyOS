@@ -5,7 +5,11 @@
                 "kernel.bin": "out/kernel.bin",
                 "int": {
                         "keyboard.int": "out/keyboard.int"
-                }
+                },
+                "Test1": "lst/boot.lst",
+                "Test2": "lst/boot.lst",
+                "TestWithLongFilename.ext": "lst/boot.lst",
+                "YoLo.bin": "lst/boot.lst"
 	},
         "output": "out/floppy.img"
 }

@@ -6,7 +6,7 @@ CFS		= ../cFS/cFS-cli/Debug/cFS-cli
 ifeq ($(OS),Windows_NT)
 	QEMU		= D:\Programs\Qemu\qemu-system-i386
 	DOS_IMG		= D:\Programs\Qemu\dos.img
-	PCEM		=
+	PCEM		= D:\Programs\PCem\PCem.exe
 else
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
@@ -28,7 +28,7 @@ image: out/floppy.img
 
 # Floppy image
 out/floppy.img: src/floppy.json boot kernel
-	$(CFS) src/floppy.json > /dev/null || echo "Couldn't create floppy disk image!"
+	$(CFS) src/floppy.json > /dev/null
 
 # Bootloader
 boot: dirs out/boot.bin
@@ -68,7 +68,7 @@ bochs: image
 	$(BOCHS) $(BOCHS_FLAGS)
 
 pcem: image
-	$(PCEM) 2>/dev/null
+	$(PCEM)
 
 # Directories
 dirs: out lst
