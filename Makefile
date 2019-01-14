@@ -21,13 +21,14 @@ NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall
 QEMU_FLAGS	= -hda $(DOS_IMG) -cpu 486 -boot ac -m 2
 BOCHS_FLAGS	= -f bochs.cfg -q
 
-all: image doc
+all: image 
+#doc
 
 image: out/floppy.img
 
 # Floppy image
 out/floppy.img: src/floppy.json boot kernel
-	$(CFS) src/floppy.json > /dev/null
+	$(CFS) src/floppy.json > /dev/null || echo "Couldn't create floppy disk image!"
 
 # Bootloader
 boot: dirs out/boot.bin

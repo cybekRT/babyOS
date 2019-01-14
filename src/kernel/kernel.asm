@@ -13,6 +13,7 @@ KERNEL_BEGIN:
 ;%include "Keyboard.asm"
 
 hdir dw 0
+printEntryStr db "File: %s",0xA,0
 
 init:
 	cli
@@ -35,11 +36,25 @@ init:
 	; Init FAT12
 	call	FAT12_Init
 	call	FAT12_OpenRoot
-	mov	[hdir], ax
+	;mov	[hdir], ax
 
-	push	word [hdir]
-	call	FAT12_CloseDirectory
-	add	sp, 2
+	mov	cx, 8
+.readLoop:
+	call	FAT12_ReadDirectory
+	;mov	byte [fatEntry + FAT12_DirectoryEntry.attributes], 0
+	mov	bx, [fatEntry]
+	add	bx, FAT12_DirectoryEntry.attributes
+	mov	byte [bx], 0
+	push	word [fatEntry]
+	push	printEntryStr
+	call	printf
+	add	sp, 4
+
+	loop	.readLoop
+
+	;push	word [hdir]
+	;call	FAT12_CloseDirectory
+	;add	sp, 2
 
 	; Keyboard
 	;call	Keyboard_Init
