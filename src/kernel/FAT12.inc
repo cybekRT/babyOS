@@ -31,7 +31,9 @@ struc FAT12_BPB
 endstruc
 
 struc FAT12_DirectoryEntry
-	.name			resb 8+3
+	;.name			resb 8+3
+	.name			resb 8
+	.ext			resb 3
 	.attributes		resb 1
 	.reserved		resb 2
 	.createTime		resb 2

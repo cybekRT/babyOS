@@ -196,6 +196,18 @@ ClusterToSector:
 	add	bx, [bpb + FAT12_BPB.reservedSectors]
 	add	bx, [bpb + FAT12_BPB.hiddenSectors]
 	add	ax, bx
+
+	; is root?
+	cmp	word [fatDirectory + FAT12_Directory.firstCluster], 0
+	jz	.exit
+
+	; not root :(
+	mov	bx, [bpb + FAT12_BPB.rootEntriesCount]
+	shr	bx, 4
+	sub	bx, 2
+	add	ax, bx
+
+.exit:
 	rpop
 	ret
 
@@ -225,4 +237,21 @@ FAT12_ReadDirectory:
 
 	add	word [fatDirectory + FAT12_Directory.currentOffset], FAT12_DirectoryEntry_size
 
+	ret
+
+;;;;;
+; (bp + 4)--- fatEntry	-	directory entry
+;;;;;
+FAT12_ChangeDirectory:
+	rpush	bp, ax
+
+	;mov	ax, fatEntry
+	mov	bx, [fatEntry]
+	add	bx, FAT12_DirectoryEntry.cluster
+	mov	ax, [bx]
+	mov	[fatDirectory + FAT12_Directory.firstCluster], ax
+	mov	[fatDirectory + FAT12_Directory.currentCluster], ax
+	mov	word [fatDirectory + FAT12_Directory.currentOffset], 0
+
+	rpop
 	ret

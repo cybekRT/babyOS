@@ -14,6 +14,10 @@ KERNEL_BEGIN:
 
 hdir dw 0
 printEntryStr db "File: %s",0xA,0
+INT_DIRECTORY db "INT        "
+INT_EXTENSION db "INT"
+foundIntDirStr db "Found directory: INT",0xA,0
+foundIntStr db "  Found interrupt!",0xA,0
 
 init:
 	cli
@@ -50,7 +54,46 @@ init:
 	call	printf
 	add	sp, 4
 
+	push	cx
+	mov	bx, 0
+	mov	es, bx
+	mov	ds, bx
+	mov	si, INT_DIRECTORY
+	mov	di, [fatEntry]
+	mov	cx, 11
+	repe	cmpsb
+	pop	cx
+	jne	.invalidName
+
+	push	foundIntDirStr
+	call	printf
+	add	sp, 2
+
+	call	FAT12_ChangeDirectory
+	mov	cx, 8
+	jmp	.readLoop
+
+.invalidName:
+	; check for files...
+	push	cx
+	mov	bx, 0
+	mov	es, bx
+	mov	ds, bx
+	mov	si, INT_EXTENSION
+	mov	di, [fatEntry]
+	add	di, 8
+	mov	cx, 3
+	repe	cmpsb
+	pop	cx
+	jne	.endOfLoop
+
+	push	foundIntStr
+	call	printf
+	add	sp, 2
+
+.endOfLoop
 	loop	.readLoop
+
 
 	;push	word [hdir]
 	;call	FAT12_CloseDirectory
