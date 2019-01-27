@@ -71,11 +71,39 @@ Keyboard_IRQ_Handler:
 
 	movzx	bx, byte [cs:kbdBufferEnd]
 	add	bx, kbdBuffer
-	mov	[bx], al
+	mov	[cs:bx], al
 	inc	byte [cs:kbdBufferEnd]
 	and	byte [cs:kbdBufferEnd], (kbdBufferSize - 1)
 
+	jmp	.keyReleased
+
 .notEnoughMemory: ; TODO beep
+
+	mov	al, 0xb6
+	out	0x43, al
+
+	mov	al, 0x51
+	out	0x42, al
+
+	mov	al, 0x22
+	out	0x42, al
+
+	in	al, 0x61
+	or	al, 3
+	out	0x61, al
+
+	mov	cx, 0xffff
+.zz:
+	push	cx
+	mov	cx, 0xf
+.zz2:
+	loop	.zz2
+	pop	cx
+	loop	.zz
+
+	and	al, ~3
+	out	0x61, al
+
 .keyReleased:
 	mov	al, 0x20
 	out	0x20, al
@@ -102,7 +130,7 @@ Keyboard_GetChar:
 
 	movzx	bx, byte [cs:kbdBufferBeg]
 	add	bx, kbdBuffer
-	mov	al, [bx]
+	mov	al, [cs:bx]
 
 	inc	byte [cs:kbdBufferBeg]
 	and	byte [cs:kbdBufferBeg], (kbdBufferSize - 1)

@@ -125,16 +125,52 @@ init:
 
 	; Keyboard
 	;call	Keyboard_Init
+
 	sti
 .kbdTest:
 	ApiCall	INT_API_KEYBOARD, 0
 	test	ax, ax
+	;jmp	$
 	jz	.kbdTest
 	ApiCall	INT_API_KEYBOARD, 1
 	push	ax
 	push	.x
 	call	printf
 	add	sp, 4
+
+
+
+
+;	mov	al, 0xb6
+;	out	0x43, al
+;
+;	mov	al, 0x51
+;	out	0x42, al
+;
+;	mov	al, 0x22
+;	out	0x42, al
+;
+;	in	al, 0x61
+;	or	al, 3
+;	out	0x61, al
+
+	mov	cx, 0xffff
+.zz:
+	push	cx
+	mov	cx, 0xf
+.zz2:
+	loop	.zz2
+	pop	cx
+	loop	.zz
+
+;	and	al, ~3
+;	out	0x61, al
+
+
+
+
+
+	
 	jmp	.kbdTest
 
 .x db "Pressed: %c",0xA,0
