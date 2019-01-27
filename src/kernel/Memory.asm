@@ -50,7 +50,7 @@ Memory_Init:
 	jz	.ret
 
 	; checks if we have enough memory for entries...
-	movzx	ax, [memoryPoolSize]
+	movzx	ax, [cs:memoryPoolSize]
 	cmp	ax, memoryPoolMaxSize
 	jae	.fail
 
@@ -131,8 +131,8 @@ Memory_InitOld:
 
 	sub	ax, 0x50
 
-	mov	word [memBlock], (KERNEL_END + 15) / 16
-	mov	bx, [memBlock]
+	mov	word [cs:memBlock], (KERNEL_END + 15) / 16
+	mov	bx, [cs:memBlock]
 	mov	es, bx
 	mov	word [es:MemBlock.size], ax
 	mov	word [es:MemBlock.next], 0
@@ -203,7 +203,7 @@ Memory_AllocSegments:
 	; es - current segment
 	; fs - prev segment
 	; gs - next segment
-	mov	es, [memBlock]
+	mov	es, [cs:memBlock]
 	mov	bx, 0
 	mov	fs, bx
 	mov	gs, [es:MemBlock.next]
@@ -239,10 +239,10 @@ Memory_AllocSegments:
 	mov	[fs:MemBlock.next], bx
 
 	mov	ax, es
-	cmp	[memBlock], ax
+	cmp	[cs:memBlock], ax
 	jne	.not_first
 
-	mov	[memBlock], bx
+	mov	[cs:memBlock], bx
 
 .not_first:
 	mov	[es:MemBlock.size], cx
@@ -304,12 +304,12 @@ Memory_Free:
 	; es - current segment
 	; fs - prev segment
 	; gs - next segment
-	mov	es, [memBlock]
+	mov	es, [cs:memBlock]
 	mov	bx, 0
 	mov	fs, bx
 	mov	gs, [es:MemBlock.next]
 
-	cmp	si, [memBlock]
+	cmp	si, [cs:memBlock]
 	jl	.xchg_first
 
 .loop:
@@ -355,10 +355,10 @@ Memory_Free:
 	;call	printf
 	;add	sp, 2
 
-	mov	bx, [memBlock]
+	mov	bx, [cs:memBlock]
 	mov	es, si
 	mov	[es:MemBlock.next], bx
-	mov	[memBlock], si
+	mov	[cs:memBlock], si
 
 	jmp	.ret
 
@@ -374,7 +374,7 @@ Memory_Free:
 	jmp	.ret
 
 .ret:
-	push	word [memBlock]
+	push	word [cs:memBlock]
 	push	.curStr
 	call	printf
 	add	sp, 4
@@ -395,7 +395,7 @@ Memory_Merge:
 	; es - current segment
 	; fs - prev segment
 	; gs - next segment
-	mov	es, [memBlock]
+	mov	es, [cs:memBlock]
 	mov	bx, 0
 	mov	fs, bx
 	mov	gs, [es:MemBlock.next]
@@ -436,10 +436,10 @@ Memory_GetFree:
 	rpush	bx, es
 
 	mov	ax, 0
-	cmp	word [memBlock], 0
+	cmp	word [cs:memBlock], 0
 	jz	.ret
 
-	mov	bx, [memBlock]
+	mov	bx, [cs:memBlock]
 	mov	es, bx
 .loop:
 	add	ax, [es:MemBlock.size]
@@ -462,10 +462,10 @@ Memory_PrintMap:
 	call	printf
 	add	sp, 2
 
-	cmp	word [memBlock], 0
+	cmp	word [cs:memBlock], 0
 	jz	.ret
 
-	mov	bx, [memBlock]
+	mov	bx, [cs:memBlock]
 	mov	es, bx
 .loop:
 	mov	ax, [es:MemBlock.size]

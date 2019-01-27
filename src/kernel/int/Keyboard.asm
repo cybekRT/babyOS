@@ -1,3 +1,14 @@
+[org 0]
+[bits 16]
+
+;mov	bx, 0xb800
+;mov	es, bx
+;mov	bx, 0
+;mov	byte [es:bx+0], 'x'
+;mov	byte [es:bx+2], 'D'
+;mov	byte [es:bx+4], ' '
+;jmp $
+
 %include "global.inc"
 %include "Interrupt.inc"
 
@@ -12,27 +23,43 @@ Keyboard_Init:
 	; Install handler
 	InstallInterrupt	IRQ2INT(IRQ_KEYBOARD), Keyboard_IRQ_Handler
 	InstallInterrupt	INT_API_KEYBOARD
+
+	;mov	ax, IRQ2INT(IRQ_KEYBOARD)
+	;jmp	$
+	
 	;mov	bx, 0
 	;mov	ds, bx
-
 	;mov	bx, 9*4
-	;mov	word [ds:bx+0], Keyboard_Handler
-	;mov	word [ds:bx+2], 0
+	;mov	word [ds:bx+0], Keyboard_IRQ_Handler
+	;mov	ax, cs
+	;mov	word [ds:bx+2], ax
+
+xchg bx, bx
+	push	cs
+	pop	ds
+	push	.initMsg
+	ApiCall INT_API_TERMINAL, 0
+	add	sp, 2
 
 	rpop
-	ret
+	retf
+.initMsg db "INT: keyboard!",0xA,0,0,0
 
 ;;;;;;;;;;
 ; Interrupt handler
 ;;;;;;;;;;
 Keyboard_IRQ_Handler:
-	rpush	ax, bx, ds
+	rpush	ax, bx
+	;, ds
 	pushf
-	mov	bx, 0
-	mov	ds, bx
+	;mov	bx, 0
+	;mov	ds, bx
 
-	mov	al, [kbdBufferBeg]
-	mov	ah, [kbdBufferEnd]
+	;push	cs
+	;pop	ds
+
+	mov	al, [cs:kbdBufferBeg]
+	mov	ah, [cs:kbdBufferEnd]
 	inc	ah
 	and	ah, (kbdBufferSize - 1)
 	cmp	al, ah
@@ -42,11 +69,11 @@ Keyboard_IRQ_Handler:
 	test	al, 0x80
 	jne	.keyReleased
 
-	movzx	bx, byte [kbdBufferEnd]
+	movzx	bx, byte [cs:kbdBufferEnd]
 	add	bx, kbdBuffer
 	mov	[bx], al
-	inc	byte [kbdBufferEnd]
-	and	byte [kbdBufferEnd], (kbdBufferSize - 1)
+	inc	byte [cs:kbdBufferEnd]
+	and	byte [cs:kbdBufferEnd], (kbdBufferSize - 1)
 
 .notEnoughMemory: ; TODO beep
 .keyReleased:
@@ -64,22 +91,26 @@ Keyboard_IRQ_Handler:
 ;;;;;;;;;;
 Keyboard_GetChar:
 	rpush	bx
+	;, ds
 
-	mov	al, [kbdBufferBeg]
-	mov	ah, [kbdBufferEnd]
+	;push	cs
+	;pop	ds
+
+	mov	al, [cs:kbdBufferBeg]
+	mov	ah, [cs:kbdBufferEnd]
 	je	.bufferEmpty
 
-	movzx	bx, byte [kbdBufferBeg]
+	movzx	bx, byte [cs:kbdBufferBeg]
 	add	bx, kbdBuffer
 	mov	al, [bx]
 
-	inc	byte [kbdBufferBeg]
-	and	byte [kbdBufferBeg], (kbdBufferSize - 1)
+	inc	byte [cs:kbdBufferBeg]
+	and	byte [cs:kbdBufferBeg], (kbdBufferSize - 1)
 
 .ret:
 	xor	ah, ah
 	rpop
-	ret
+	iret
 .bufferEmpty:
 	stc
 	;mov	ax, 0
@@ -91,11 +122,18 @@ Keyboard_GetChar:
 ;	ax	-	characters in buffer
 ;;;;;;;;;;
 Keyboard_GetBufferLength:
+	;rpush	ds
+
+	;push	cs
+	;pop	ds
+
 	xor	ah, ah
-	mov	al, [kbdBufferEnd]
-	sub	al, [kbdBufferBeg]
+	mov	al, [cs:kbdBufferEnd]
+	sub	al, [cs:kbdBufferBeg]
 	and	ax, (kbdBufferSize - 1)
-	ret
+
+	;rpop
+	iret
 
 kbdBufferBeg db 0
 kbdBufferEnd db 0

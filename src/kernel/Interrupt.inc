@@ -36,12 +36,12 @@ INT_MAIN_HANDLER:
 	mov	bx, INT_MAIN_HANDLER
 %undef INT_MAIN_HANDLER
 %elif %0 = 2
-	mov	bx, %1
+	mov	bx, %2
 %else
 %fatal Invalid interrupt installer
 %endif
 
-	mov	word [es:0 + (%1 * 4)], bx
+	mov	word [es:0 + (%1 * 4) + 0], bx
 	mov	bx, cs
 	mov	word [es:0 + (%1 * 4) + 2], bx
 
@@ -110,7 +110,8 @@ INT_VIRTUALIZATION_EXCEPTION		equ 0x14
 INT_CONTROL_PROTECTION_EXCEPTION	equ 0x15
 
 INT_API_MEMORY		equ 0x80
-INT_API_KEYBOARD	equ 0x81
+INT_API_TERMINAL	equ 0x81
+INT_API_KEYBOARD	equ 0x82
 
 %macro ApiCall 2
 	mov	ah, %2

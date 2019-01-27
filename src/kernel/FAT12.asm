@@ -157,6 +157,12 @@ FAT12_CloseDirectory:
 ReadSector:
 	rpush	bp, ax, bx, cx, dx, es
 
+	push	word [bp + 8]
+	push	word [bp + 4]
+	push	.msg
+	call	printf
+	add	sp, 6
+
 	; LBA 2 CHS
 	mov	bl, [bpb + FAT12_BPB.sectorsPerTrack]
 	div	bl
@@ -187,6 +193,7 @@ ReadSector:
 	ret
 .Panic:
 	call	Panic
+.msg db "Reading sector: %u -> %x",0xA,0
 
 ; ax - cluster
 ClusterToSector:
@@ -210,6 +217,77 @@ ClusterToSector:
 .exit:
 	rpop
 	ret
+
+; ax - cluster
+NextCluster:
+	rpush	bx
+
+	; bx - fat_offset
+	mov	bx, ax
+	shr	bx, 1
+	add	bx, ax
+
+	mov	bx, [fat + bx]
+	test	ax, 1
+	jnz	.odd
+	jz	.even
+
+.odd:
+	shr	bx, 4
+	jmp	.end
+
+.even:
+	and	bx, 0x0fff
+	jmp	.end
+
+.end:
+	mov	ax, bx
+	rpop
+	ret
+
+ReadWholeFile:
+	rpush	bx
+
+	mov	bx, [fatEntry]
+	;mov	eax, [bx + FAT12_DirectoryEntry.size]
+	;add	eax, 15
+	;shr	eax, 4
+	;push	ax
+	;ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_SEGMENTS
+	;add	sp, 2
+	mov	ax, [bx + FAT12_DirectoryEntry.size]
+	add	ax, 511
+	and	ax, 0xfe00
+	push	ax
+	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	add	sp, 2
+
+	;mov	[.dataPtr], ax
+	mov	di, ax
+	push	di
+	mov	ax, [bx + FAT12_DirectoryEntry.cluster]
+.readLoop:
+	push	ax
+	call	ClusterToSector
+
+	push	di
+	push	1
+	push	ax
+	call	ReadSector
+	add	sp, 6
+
+	add	di, 512/16
+	pop	ax
+	call	NextCluster
+
+	cmp	ax, CLUSTER_LAST
+	jb	.readLoop
+
+; Return
+	pop	ax
+	rpop
+	ret
+;.dataPtr dw 0
 
 FAT12_ReadDirectory:
 	cmp	word [fatDirectory + FAT12_Directory.currentOffset], 0

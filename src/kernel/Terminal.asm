@@ -1,8 +1,11 @@
+%define TAB_WIDTH 8
+
+InterruptInfo Terminal_Init, Terminal_INT_Print
+
 ;terminalX dw 0
 ;terminalY dw 0 
-terminalPos dw 0
 
-%define TAB_WIDTH 8
+terminalPos dw 0
 
 Terminal_Init:
 	; mode 2
@@ -38,10 +41,32 @@ Terminal_Init:
 	call	Terminal_Write
 	add	sp, 2
 
+	; Install interrupts
+	InstallInterrupt	INT_API_TERMINAL
+
 	ret
 
 .hello db OS_NAME,0xA,0xA,'Terminal initialized!',0xA,0
 ;'babyOS v0.1'
+
+Terminal_INT_Print:
+	rpush	bp, ax, bx, ds
+
+	mov	ax, [bp+8]
+	;mov	bx,  cs
+	;shl	bx, 4
+	;add	ax, bx
+	push	ax
+	;push	cs
+	;pop	ds
+	call	Terminal_Print
+	add	sp, 2
+
+	;add	bp, 8
+	;call	Terminal_Print
+
+	rpop
+	iret
 
 ; Text: [ds:bp+4]
 ; NULL-terminated
@@ -188,7 +213,7 @@ Terminal_Scroll:
 ;
 %define printf Terminal_Print
 Terminal_Print:
-	rpush	bp, bx, cx, dx, si, di
+	rpush	bp, ax, bx, cx, dx, si, di
 
 	mov	si, [bp+4]
 	mov	di, bp

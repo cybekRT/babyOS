@@ -7,6 +7,7 @@ ifeq ($(OS),Windows_NT)
 	QEMU		= D:\Programs\Qemu\qemu-system-i386
 	DOS_IMG		= D:\Programs\Qemu\dos.img
 	PCEM		= D:\Programs\PCem\PCem.exe
+	BOCHS		= D:\Programs\Bochs\bochsdbg-p4-smp.exe
 else
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
@@ -44,7 +45,7 @@ out/kernel.bin: src/kernel/*
 INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
 int: dirs ${addprefix out/, ${notdir ${basename ${INT_FILES}}}.int}
 
-out/%.int: src/kernel/int/%.asm
+out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $(OUT_DIR)/$(shell basename $< .asm).int
 
 # Documentation
@@ -62,7 +63,7 @@ qemu: image
 	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -monitor stdio
 
 qemu-debug: image
-	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -s -S
+	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -s -S -monitor stdio
 
 bochs: image
 	$(BOCHS) $(BOCHS_FLAGS)

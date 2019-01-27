@@ -17,7 +17,8 @@ printEntryStr db "File: %s",0xA,0
 INT_DIRECTORY db "INT        "
 INT_EXTENSION db "INT"
 foundIntDirStr db "Found directory: INT",0xA,0
-foundIntStr db "  Found interrupt!",0xA,0
+foundIntStr db "  Found interrupt: %u",0xA,0
+kernelEndStr db "Kernel end at: %x",0xA,0
 
 init:
 	cli
@@ -37,6 +38,11 @@ init:
 	mov	ss, ax
 	mov	sp, 2048
 
+	push	KERNEL_END
+	push	kernelEndStr
+	call	printf
+	add	sp, 4
+
 	; Init FAT12
 	call	FAT12_Init
 	call	FAT12_OpenRoot
@@ -51,7 +57,7 @@ init:
 	mov	byte [bx], 0
 	push	word [fatEntry]
 	push	printEntryStr
-	call	printf
+	;call	printf
 	add	sp, 4
 
 	push	cx
@@ -87,12 +93,30 @@ init:
 	pop	cx
 	jne	.endOfLoop
 
+	mov	bx, [fatEntry]
+	push	word [bx + FAT12_DirectoryEntry.size]
 	push	foundIntStr
 	call	printf
-	add	sp, 2
+	add	sp, 4
+	call	ReadWholeFile
 
-.endOfLoop
-	loop	.readLoop
+	;mov	es, ax
+	;mov	cs, ax
+	;jmp	0
+	;jmp	0
+
+	push	ax
+	push	0
+	;retf
+	;call	ax:0
+	mov	bx, sp
+	call	far [ss:bx]
+	add	sp, 4
+
+.endOfLoop:
+	dec	cx
+	jnz	.readLoop
+	;loop	.readLoop
 
 
 	;push	word [hdir]
@@ -101,6 +125,19 @@ init:
 
 	; Keyboard
 	;call	Keyboard_Init
+	sti
+.kbdTest:
+	ApiCall	INT_API_KEYBOARD, 0
+	test	ax, ax
+	jz	.kbdTest
+	ApiCall	INT_API_KEYBOARD, 1
+	push	ax
+	push	.x
+	call	printf
+	add	sp, 4
+	jmp	.kbdTest
+
+.x db "Pressed: %c",0xA,0
 
 	;sti
 
