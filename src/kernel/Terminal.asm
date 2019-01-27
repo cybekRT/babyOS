@@ -1,6 +1,6 @@
 %define TAB_WIDTH 8
 
-InterruptInfo Terminal_Init, Terminal_INT_Print
+InterruptInfo Terminal_Init, Terminal_INT_Print, Terminal_INT_PrintA1
 
 ;terminalX dw 0
 ;terminalY dw 0 
@@ -61,6 +61,23 @@ Terminal_INT_Print:
 	;pop	ds
 	call	Terminal_Print
 	add	sp, 2
+
+	;add	bp, 8
+	;call	Terminal_Print
+
+	rpop
+	iret
+
+Terminal_INT_PrintA1:
+	rpush	bp, ax
+	;, bx, ds
+
+	mov	ax, [bp+10]
+	push	ax
+	mov	ax, [bp+8]
+	push	ax
+	call	Terminal_Print
+	add	sp, 4
 
 	;add	bp, 8
 	;call	Terminal_Print

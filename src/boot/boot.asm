@@ -1,8 +1,8 @@
 [bits 16]
 [org 0x7c00]
 [cpu 386]
-%include "../global.inc"
-%include "../kernel/FAT12.inc"
+%include "global.inc"
+%include "kernel/FAT12.inc"
 
 ; CHS
 ; 80, 2, 18

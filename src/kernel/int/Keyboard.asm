@@ -49,7 +49,7 @@ xchg bx, bx
 ; Interrupt handler
 ;;;;;;;;;;
 Keyboard_IRQ_Handler:
-	rpush	ax, bx
+	rpush	ax, bx, cx
 	;, ds
 	pushf
 	;mov	bx, 0
@@ -78,31 +78,32 @@ Keyboard_IRQ_Handler:
 	jmp	.keyReleased
 
 .notEnoughMemory: ; TODO beep
+;	mov	al, 0xb6
+;	out	0x43, al
+;
+;	mov	al, 0x51
+;	out	0x42, al
+;
+;	mov	al, 0x22
+;	out	0x42, al
+;
+;	in	al, 0x61
+;	or	al, 3
+;	out	0x61, al
+;
+;	mov	cx, 0xffff
+;.zz:
+;	push	cx
+;	mov	cx, 0xf
+;.zz2:
+;	loop	.zz2
+;	pop	cx
+;	loop	.zz
+;
+;	and	al, ~3
+;	out	0x61, al
 
-	mov	al, 0xb6
-	out	0x43, al
-
-	mov	al, 0x51
-	out	0x42, al
-
-	mov	al, 0x22
-	out	0x42, al
-
-	in	al, 0x61
-	or	al, 3
-	out	0x61, al
-
-	mov	cx, 0xffff
-.zz:
-	push	cx
-	mov	cx, 0xf
-.zz2:
-	loop	.zz2
-	pop	cx
-	loop	.zz
-
-	and	al, ~3
-	out	0x61, al
+	in	al, 0x60
 
 .keyReleased:
 	mov	al, 0x20
@@ -126,6 +127,7 @@ Keyboard_GetChar:
 
 	mov	al, [cs:kbdBufferBeg]
 	mov	ah, [cs:kbdBufferEnd]
+	cmp	al, ah
 	je	.bufferEmpty
 
 	movzx	bx, byte [cs:kbdBufferBeg]
@@ -150,20 +152,25 @@ Keyboard_GetChar:
 ;	ax	-	characters in buffer
 ;;;;;;;;;;
 Keyboard_GetBufferLength:
-	;rpush	ds
+	rpush	ds
 
-	;push	cs
-	;pop	ds
+	push	cs
+	pop	ds
 
 	xor	ah, ah
 	mov	al, [cs:kbdBufferEnd]
 	sub	al, [cs:kbdBufferBeg]
+	;mov	al, [cs:kbdBufferEnd]
+	;mov	ah, [cs:kbdBufferBeg]
+	;sub	al, ah
 	and	ax, (kbdBufferSize - 1)
 
-	;rpop
+	rpop
 	iret
 
 kbdBufferBeg db 0
 kbdBufferEnd db 0
-kbdBuffer times 8 db 0
-kbdBufferSize equ ($ - kbdBuffer) ; Must be power of two
+;kbdBuffer times 8 db 0
+;kbdBufferSize equ ($ - kbdBuffer) ; Must be power of two
+kbdBufferSize equ 16 ; Must be power of two
+kbdBuffer times kbdBufferSize db 0

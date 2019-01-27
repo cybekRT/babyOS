@@ -1,6 +1,6 @@
 NASM		= nasm
 BOCHS		= bochs
-PHP		= php
+#PHP		= php
 CFS		= ../cFS/cFS-cli/Debug/cFS-cli
 
 ifeq ($(OS),Windows_NT)
@@ -8,6 +8,7 @@ ifeq ($(OS),Windows_NT)
 	DOS_IMG		= D:\Programs\Qemu\dos.img
 	PCEM		= D:\Programs\PCem\PCem.exe
 	BOCHS		= D:\Programs\Bochs\bochsdbg-p4-smp.exe
+	PHP		= D:/Workspace/babyOS/php.exe
 else
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
@@ -18,7 +19,7 @@ SRC_DIR		= src
 OUT_DIR		= out
 LST_DIR		= lst
 
-NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall
+NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall -D__BASE_FILENAME__="\"$(shell basename $< .asm)\""
 QEMU_FLAGS	= -hda $(DOS_IMG) -cpu 486 -boot ac -m 2
 BOCHS_FLAGS	= -f bochs.cfg -q
 
@@ -43,7 +44,8 @@ out/kernel.bin: src/kernel/*
 
 # Interrupts
 INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
-int: dirs ${addprefix out/, ${notdir ${basename ${INT_FILES}}}.int}
+
+int: dirs ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
 
 out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $(OUT_DIR)/$(shell basename $< .asm).int
@@ -64,6 +66,9 @@ qemu: image
 
 qemu-debug: image
 	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -s -S -monitor stdio
+
+dos: image
+	$(QEMU) $(QEMU_FLAGS) -fda $(OUT_DIR)/floppy.img -boot c
 
 bochs: image
 	$(BOCHS) $(BOCHS_FLAGS)

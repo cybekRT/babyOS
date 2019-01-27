@@ -4,7 +4,8 @@
         "/": {
                 "kernel.bin": "out/kernel.bin",
                 "int": {
-                        "keyboard.int": "out/keyboard.int"
+                        "keyboard.int": "out/keyboard.int",
+                        "test.int": "out/test.int"
                 },
                 "Test1": "lst/boot.lst",
                 "Test2": "lst/boot.lst",

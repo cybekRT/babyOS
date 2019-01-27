@@ -1,15 +1,10 @@
 %include "FAT12.inc"
 
-;bpb dw 0
 align 16, db 0
 bpb times FAT12_BPB_size db 0
 fat times (512 * 9) db 0 ; TODO check if this is correct, better before changing to dynamic memory...
 fatDirectory times FAT12_Directory_size db 0
-;fatEntry times FAT12_DirectoryEntry_size db 0
-;fatData times 512 db 0
-;fatEntry times FAT12_DirectoryEntry_size db 0
 fatEntry dw 0
-;fat dw 0
 
 FAT12_Init:
 	rpush	ax, bx, cx, dx, es
@@ -193,7 +188,7 @@ ReadSector:
 	ret
 .Panic:
 	call	Panic
-.msg db "Reading sector: %u -> %x",0xA,0
+.msg db 0, "Reading sector: %u -> %x",0xA,0
 
 ; ax - cluster
 ClusterToSector:

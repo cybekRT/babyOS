@@ -136,9 +136,11 @@ init:
 	push	ax
 	push	.x
 	call	printf
+	;add	sp, 4
+
 	add	sp, 4
-
-
+	cmp	ax, '0'
+	je	halt
 
 
 ;	mov	al, 0xb6
@@ -154,14 +156,14 @@ init:
 ;	or	al, 3
 ;	out	0x61, al
 
-	mov	cx, 0xffff
-.zz:
-	push	cx
-	mov	cx, 0xf
-.zz2:
-	loop	.zz2
-	pop	cx
-	loop	.zz
+;	mov	cx, 0xffff
+;.zz:
+;	push	cx
+;	mov	cx, 0xf
+;.zz2:
+;	loop	.zz2
+;	pop	cx
+;	loop	.zz
 
 ;	and	al, ~3
 ;	out	0x61, al

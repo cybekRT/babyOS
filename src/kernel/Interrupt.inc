@@ -45,6 +45,28 @@ INT_MAIN_HANDLER:
 	mov	bx, cs
 	mov	word [es:0 + (%1 * 4) + 2], bx
 
+%if %0 = 1
+	push	ds
+	push	cs
+	pop	ds
+	push	%1
+	push	%%.msg
+	ApiCall	INT_API_TERMINAL, 1
+	add	sp, 4
+	pop	ds
+
+	jmp	%%.msg_g
+%%.msg:
+%if __BASE_FILENAME__ == "kernel"
+%substr __FILE_BASE__ __FILE__ 12, -5
+db "ISR: ", __FILE_BASE__, " (%X)", 0xA, 0
+%else
+db "ISR: ", __BASE_FILENAME__, " (%X)", 0xA, 0
+%endif
+%%.msg_g:
+
+%endif
+
 	pop	es
 	pop	bx
 %endmacro
