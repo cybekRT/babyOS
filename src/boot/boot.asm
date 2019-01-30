@@ -49,6 +49,9 @@ rootOffset dw 0
 kernelCluster dw 0
 kernelPosition dw KERNEL_LOC
 fatSector dw 0xFFFF
+helloMsg db "Loading kernel..."
+helloMsgLen equ ($ - helloMsg)
+db helloMsgLen
 ;;;;;
 
 Init:
@@ -58,6 +61,14 @@ Init:
 
 	; Clear screen
 	mov	ax, 3
+	int	10h
+
+	; Display hello message
+	mov	ax, 0x1301
+	mov	bx, 0x000F
+	mov	cx, helloMsgLen
+	mov	dx, 0
+	mov	bp, helloMsg
 	int	10h
 
 	; Calculate last root sector
@@ -114,12 +125,12 @@ ExecuteKernel:
 	jmp	0x0:KERNEL_LOC ; Execute kernel
 
 Fail:
-	mov	bx, 0xb800
-	mov	es, bx
-	mov	bx, 0
-	mov	byte [es:bx+0], 'F'
-	mov	byte [es:bx+2], ' '
-	jmp	$
+	;mov	bx, 0xb800
+	;mov	es, bx
+	;mov	bx, 0
+	;mov	byte [es:bx+0], 'F'
+	;mov	byte [es:bx+2], ' '
+	;jmp	$
 
 ; Boot other device...
 	int	0x18

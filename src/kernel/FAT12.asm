@@ -1,7 +1,8 @@
 %include "FAT12.inc"
 
+;bpb times FAT12_BPB_size db 0
+bpbPtr dw 0 
 align 16, db 0
-bpb times FAT12_BPB_size db 0
 fat times (512 * 9) db 0 ; TODO check if this is correct, better before changing to dynamic memory...
 fatDirectory times FAT12_Directory_size db 0
 fatEntry dw 0
@@ -43,6 +44,13 @@ FAT12_Init:
 	;push	word 0
 	;call	ReadSector
 	;add	sp, 6
+
+	push	512
+	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	add	sp, 2
+	mov	[cs:bpbPtr], ax
+	mov	es, ax
+
 	; Read BPB with BIOS function
 	mov	ah, 02h
 	mov	al, 1
@@ -50,11 +58,14 @@ FAT12_Init:
 	mov	cl, 1
 	mov	dh, 0
 	mov	dl, 0
+	;mov	bx, [cs:bpbPtr]
+	;mov	es, bx
 	mov	bx, 0
-	mov	es, bx
-	mov	bx, bpb
 	int	13h
 	jc	Panic
+
+	mov	al, [cs:driveNumber]
+	mov	[es:FAT12_BPB.driveNumber], al
 
 	; Read FAT
 	;push	word fat
@@ -62,12 +73,14 @@ FAT12_Init:
 	shr	ax, 4
 	push	ax
 
-	push	word [bpb + FAT12_BPB.sectorsPerFat]
-	mov	ax, [bpb + FAT12_BPB.reservedSectors]
-	add	ax, [bpb + FAT12_BPB.hiddenSectors]
+	push	word [es : FAT12_BPB.sectorsPerFat]
+	mov	ax, [es : FAT12_BPB.reservedSectors]
+	add	ax, [es : FAT12_BPB.hiddenSectors]
 	push	ax
 	call	ReadSector
 	add	sp, 6
+
+	;call	Panic
 
 	rpop
 	ret
@@ -150,23 +163,30 @@ FAT12_CloseDirectory:
 ; (bp+4) - sector
 ;;;;;
 ReadSector:
-	rpush	bp, ax, bx, cx, dx, es
+	rpush	bp, ax, bx, cx, dx, si, es
+
+	;push	ds
+	;push	cs
+	;pop	ds
 
 	push	word [bp + 8]
 	push	word [bp + 4]
-	push	.msg
+	push	word [bp + 6]
+	push	word .msg
 	call	printf
-	add	sp, 6
+	add	sp, 8
+
+	mov	es, [cs:bpbPtr]
 
 	; LBA 2 CHS
-	mov	bl, [bpb + FAT12_BPB.sectorsPerTrack]
+	mov	bl, [es : FAT12_BPB.sectorsPerTrack]
 	div	bl
 
 	mov	cl, ah ; Sectors
 	inc	cl
 	xor	ah, ah
 
-	mov	bl, [bpb + FAT12_BPB.headsCount]
+	mov	bl, [es : FAT12_BPB.headsCount]
 	div	bl
 
 	mov	dh, ah ; Heads
@@ -179,7 +199,7 @@ ReadSector:
 	;;;;;
 	mov	ah, 02h
 	mov	al, [bp + 6]
-	mov	dl, [bpb + FAT12_BPB.driveNumber]
+	mov	dl, [es : FAT12_BPB.driveNumber]
 
 	int	13h
 	jc	.Panic
@@ -188,15 +208,17 @@ ReadSector:
 	ret
 .Panic:
 	call	Panic
-.msg db 0, "Reading sector: %u -> %x",0xA,0
+.msg db "Reading sector(s: %u): %u -> %x",0xA,0
 
 ; ax - cluster
 ClusterToSector:
-	rpush	bx
-	mov	bx, [bpb + FAT12_BPB.sectorsPerFat]
+	rpush	bx, es
+	mov	es, [cs:bpbPtr]
+
+	mov	bx, [es : FAT12_BPB.sectorsPerFat]
 	shl	bx, 1
-	add	bx, [bpb + FAT12_BPB.reservedSectors]
-	add	bx, [bpb + FAT12_BPB.hiddenSectors]
+	add	bx, [es : FAT12_BPB.reservedSectors]
+	add	bx, [es : FAT12_BPB.hiddenSectors]
 	add	ax, bx
 
 	; is root?
@@ -204,7 +226,7 @@ ClusterToSector:
 	jz	.exit
 
 	; not root :(
-	mov	bx, [bpb + FAT12_BPB.rootEntriesCount]
+	mov	bx, [es : FAT12_BPB.rootEntriesCount]
 	shr	bx, 4
 	sub	bx, 2
 	add	ax, bx

@@ -3,14 +3,16 @@
 [CPU 386]
 
 KERNEL_BEGIN:
-	jmp	init
+	mov	dl, [0x7C00 + FAT12_BPB.driveNumber]
+	mov	[driveNumber], dl
+	mov	bp, 0
+	call	init
 
 %include "../global.inc"
 %include "Interrupt.inc"
 %include "Terminal.asm"
 %include "Memory.asm"
 %include "FAT12.asm"
-;%include "Keyboard.asm"
 
 hdir dw 0
 printEntryStr db "File: %s",0xA,0
@@ -19,8 +21,12 @@ INT_EXTENSION db "INT"
 foundIntDirStr db "Found directory: INT",0xA,0
 foundIntStr db "  Found interrupt: %u",0xA,0
 kernelEndStr db "Kernel end at: %x",0xA,0
+driveNumber db 0
 
 init:
+	push	bp
+	mov	bp, sp
+
 	cli
 	mov	bx, 0;cs
 	mov	ds, bx
@@ -208,6 +214,7 @@ Panic:
 	;call	Memory_PrintMap
 
 	; [bp] - ip
+	push	bp
 	mov	bp, sp
 
 	; dump
@@ -226,13 +233,34 @@ Panic:
 	push	panicMsg
 	call	printf
 
-	call	Memory_PrintMap
+	;call	Memory_PrintMap
+
+	; Print callstack msg
+	push	callStackMsg
+	call	printf
+	add	sp, 2
+
+	; Print callstack entries
+.csLoop:
+	mov	ax, [bp+2]
+	sub	ax, 0x500
+	push	ax
+	push	word [bp+2]
+	push	word [bp+4]
+	push	callStackEntryMsg
+	call	printf
+	add	sp, 8
+
+	mov	sp, bp
+	pop	bp
+	test	bp, bp
+	jnz	.csLoop
 
 	cli
 	hlt
 	jmp	Panic
 
-panicMsg: db 0xA,'Kernel halted!',0xA,\
+panicMsg db 0xA,'Kernel halted!',0xA,\
 	'Registers:',0xA,\
 	'	AX: %x	BX: %x',0xA,\
 	'	CX: %x	DX: %x',0xA,\
@@ -240,6 +268,9 @@ panicMsg: db 0xA,'Kernel halted!',0xA,\
 	'	SS: %x	SP: %x',0xA,\
 	'	DS: %x	ES: %x',0xA,\
 	'	CS: %x	IP: %x',0xA,0
+
+callStackMsg db 'Call stack:',0xA,0
+callStackEntryMsg db "    <- (%X:) %X ( %X )",0xA,0
 
 stackEnd: times 64 db 0
 stackBegin:
