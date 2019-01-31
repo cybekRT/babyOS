@@ -39,7 +39,6 @@ init:
 
 	; Alloc memory for stack
 	push	2048
-	;call	Memory_AllocBytes
 	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
 	mov	ss, ax
 	mov	sp, 2048
@@ -52,26 +51,26 @@ init:
 	; Init FAT12
 	call	FAT12_Init
 	call	FAT12_OpenRoot
-	;mov	[hdir], ax
 
 	mov	cx, 8
 .readLoop:
 	call	FAT12_ReadDirectory
-	;mov	byte [fatEntry + FAT12_DirectoryEntry.attributes], 0
-	mov	bx, [fatEntry]
-	add	bx, FAT12_DirectoryEntry.attributes
-	mov	byte [bx], 0
-	push	word [fatEntry]
+
+	mov	bx, [cs:fatEntry]
+	shl	bx, 4
+	mov	byte [bx + FAT12_DirectoryEntry.attributes], 0
+	push	bx
 	push	printEntryStr
-	;call	printf
+	call	printf
 	add	sp, 4
 
 	push	cx
 	mov	bx, 0
-	mov	es, bx
 	mov	ds, bx
 	mov	si, INT_DIRECTORY
-	mov	di, [fatEntry]
+	push	word [cs:fatEntry]
+	pop	es
+	mov	di, FAT12_DirectoryEntry.name
 	mov	cx, 11
 	repe	cmpsb
 	pop	cx
@@ -89,32 +88,25 @@ init:
 	; check for files...
 	push	cx
 	mov	bx, 0
-	mov	es, bx
 	mov	ds, bx
 	mov	si, INT_EXTENSION
-	mov	di, [fatEntry]
+	push	word [cs:fatEntry]
+	pop	es
+	mov	di, FAT12_DirectoryEntry.name
 	add	di, 8
 	mov	cx, 3
 	repe	cmpsb
 	pop	cx
 	jne	.endOfLoop
 
-	mov	bx, [fatEntry]
-	push	word [bx + FAT12_DirectoryEntry.size]
+	push	word [es : FAT12_DirectoryEntry.size]
 	push	foundIntStr
 	call	printf
 	add	sp, 4
 	call	ReadWholeFile
 
-	;mov	es, ax
-	;mov	cs, ax
-	;jmp	0
-	;jmp	0
-
 	push	ax
 	push	0
-	;retf
-	;call	ax:0
 	mov	bx, sp
 	call	far [ss:bx]
 	add	sp, 4
@@ -129,90 +121,27 @@ init:
 	;call	FAT12_CloseDirectory
 	;add	sp, 2
 
-	; Keyboard
-	;call	Keyboard_Init
-
 	sti
 .kbdTest:
 	ApiCall	INT_API_KEYBOARD, 0
 	test	ax, ax
-	;jmp	$
 	jz	.kbdTest
 	ApiCall	INT_API_KEYBOARD, 1
 	push	ax
 	push	.x
 	call	printf
-	;add	sp, 4
-
 	add	sp, 4
+
 	cmp	ax, '0'
 	je	halt
-
-
-;	mov	al, 0xb6
-;	out	0x43, al
-;
-;	mov	al, 0x51
-;	out	0x42, al
-;
-;	mov	al, 0x22
-;	out	0x42, al
-;
-;	in	al, 0x61
-;	or	al, 3
-;	out	0x61, al
-
-;	mov	cx, 0xffff
-;.zz:
-;	push	cx
-;	mov	cx, 0xf
-;.zz2:
-;	loop	.zz2
-;	pop	cx
-;	loop	.zz
-
-;	and	al, ~3
-;	out	0x61, al
-
-
-
-
-
-	
-	jmp	.kbdTest
+	jne	.kbdTest
 
 .x db "Pressed: %c",0xA,0
 
-	;sti
-
 halt:
-	;cli
-	;hlt
-	;jmp	halt
-	call	Panic
-.test:
-	hlt
-	;call	Keyboard_GetBufferLength
-	cmp	ax, 0
-	jz	.test
-
-	mov	bx, ax
-	;call	Keyboard_GetChar
-	jc	.test
-	push	ax
-	push	bx
-	push	.buff
-	call	printf
-	add	sp, 6
-	jmp	.test
-.bufsizestr db 'Buffer: %d  ', 0xD,0
-.buff db "Buffer %d, %c",0xA,0
-
 	call	Panic
 
 Panic:
-	;call	Memory_PrintMap
-
 	; [bp] - ip
 	push	bp
 	mov	bp, sp
@@ -233,7 +162,7 @@ Panic:
 	push	panicMsg
 	call	printf
 
-	;call	Memory_PrintMap
+	call	Memory_PrintMap
 
 	; Print callstack msg
 	push	callStackMsg
@@ -251,10 +180,17 @@ Panic:
 	call	printf
 	add	sp, 8
 
+	;jmp $
+
 	mov	sp, bp
 	pop	bp
 	test	bp, bp
 	jnz	.csLoop
+
+	; Print footer
+	push	callStackEndMsg
+	call	printf
+	add	sp, 2
 
 	cli
 	hlt
@@ -267,11 +203,12 @@ panicMsg db 0xA,'Kernel halted!',0xA,\
 	'	SI: %x	DI: %x',0xA,\
 	'	SS: %x	SP: %x',0xA,\
 	'	DS: %x	ES: %x',0xA,\
-	'	CS: %x	IP: %x',0xA,0
+	'	CS: %x	IP: %x',0xA,0xA,0
 
-callStackMsg db 'Call stack:',0xA,0
-callStackEntryMsg db "    <- (%X:) %X ( %X )",0xA,0
+callStackMsg db 0xA,'Call stack:',0xA,0
+callStackEntryMsg db "    ^   (%X:)%X ( %X )",0xA,0
+callStackEndMsg db   "    --     bootloader     --",0xA,0
 
-stackEnd: times 64 db 0
+stackEnd: times 32 db 0
 stackBegin:
 KERNEL_END equ $-$$ + 0x500
