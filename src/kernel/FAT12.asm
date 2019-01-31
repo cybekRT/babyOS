@@ -93,12 +93,12 @@ FAT12_CloseDirectory:
 ReadSector:
 	rpush	bp, ax, bx, cx, dx, si, es
 
-	push	word [bp + 8]
-	push	word [bp + 4]
-	push	word [bp + 6]
-	push	word .msg
-	call	printf
-	add	sp, 8
+	;push	word [bp + 8]
+	;push	word [bp + 4]
+	;push	word [bp + 6]
+	;push	word .msg
+	;call	printf
+	;add	sp, 8
 
 	mov	es, [cs:bpbPtr]
 
@@ -240,9 +240,9 @@ ReadWholeFile:
 FAT12_ReadDirectory:
 	rpush	ax, es
 
-	push	.readMsg
-	call	printf
-	add	sp, 2
+	;push	.readMsg
+	;call	printf
+	;add	sp, 2
 
 	push	word [cs:fatDirectoryPtr]
 	pop	es

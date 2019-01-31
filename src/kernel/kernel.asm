@@ -56,13 +56,13 @@ init:
 .readLoop:
 	call	FAT12_ReadDirectory
 
-	mov	bx, [cs:fatEntry]
-	shl	bx, 4
-	mov	byte [bx + FAT12_DirectoryEntry.attributes], 0
-	push	bx
-	push	printEntryStr
-	call	printf
-	add	sp, 4
+	;mov	bx, [cs:fatEntry]
+	;shl	bx, 4
+	;mov	byte [bx + FAT12_DirectoryEntry.attributes], 0
+	;push	bx
+	;push	printEntryStr
+	;call	printf
+	;add	sp, 4
 
 	push	cx
 	mov	bx, 0
