@@ -232,6 +232,13 @@ Terminal_Scroll:
 Terminal_Print:
 	rpush	bp, ax, bx, cx, dx, si, di
 
+	; Wait for vsync
+	mov	dx, 0x3DA
+.vsync:
+	in	al, dx
+	test	al, 8
+	jz	.vsync
+
 	mov	si, [bp+4]
 	mov	di, bp
 	add	di, 6

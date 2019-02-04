@@ -20,7 +20,6 @@ INT_DIRECTORY db "INT        "
 INT_EXTENSION db "INT"
 foundIntDirStr db "Found directory: INT",0xA,0
 foundIntStr db "  Found interrupt: %u",0xA,0
-kernelEndStr db "Kernel end at: %x",0xA,0
 driveNumber db 0
 
 init:
@@ -42,11 +41,6 @@ init:
 	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
 	mov	ss, ax
 	mov	sp, 2048
-
-	push	KERNEL_END
-	push	kernelEndStr
-	call	printf
-	add	sp, 4
 
 	; Init FAT12
 	call	FAT12_Init
@@ -123,6 +117,7 @@ init:
 
 	sti
 .kbdTest:
+	hlt
 	ApiCall	INT_API_KEYBOARD, 0
 	test	ax, ax
 	jz	.kbdTest
@@ -142,12 +137,11 @@ halt:
 	call	Panic
 
 Panic:
-	; [bp] - ip
 	push	bp
 	mov	bp, sp
 
 	; dump
-	push	word [bp]
+	push	word [bp+2] ; ip
 	push	cs
 	push	es
 	push	ds
@@ -209,6 +203,6 @@ callStackMsg db 0xA,'Call stack:',0xA,0
 callStackEntryMsg db "    ^   (%X:)%X ( %X )",0xA,0
 callStackEndMsg db   "    --     bootloader     --",0xA,0
 
-stackEnd: times 32 db 0
+stackEnd: times 64 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
 stackBegin:
 KERNEL_END equ $-$$ + 0x500
