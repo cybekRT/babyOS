@@ -35,25 +35,25 @@ out/floppy.img: src/floppy.json boot kernel
 
 # Bootloader
 boot: dirs out/boot.bin
-out/boot.bin: src/boot/* out/kernel.bin
-	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
+$(OUT_DIR)/boot.bin: $(SRC_DIR)/boot/boot.asm
+	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}} $< -o $@
+# -I$(SRC_DIR)/boot/
 
 # Kernel
-kernel: dirs int int_inc out/kernel.bin
-out/kernel.bin: src/kernel/*
-	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/kernel.lst -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $(OUT_DIR)/kernel.bin
+kernel: dirs int out/kernel.bin
+out/kernel.bin: src/kernel/*.asm src/kernel/*.inc src/kernel/interrupt_codes.inc
+	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}} -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $@
 
 # Interrupts
 INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
 
-int: dirs int_inc ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
+int: dirs src/kernel/interrupt_codes.inc ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
 
-int_inc: src/kernel/interrupt_codes.inc
 src/kernel/interrupt_codes.inc: src/kernel/int/*.asm src/kernel/Memory.asm src/kernel/Terminal.asm
 	php src/int.php > $@
 
 out/%.int: src/kernel/int/%.asm src/kernel/*.inc
-	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $(OUT_DIR)/$(shell basename $< .asm).int
+	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
 
 # Documentation
 doc: dirs int_doc
