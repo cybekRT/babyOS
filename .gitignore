@@ -3,3 +3,5 @@
 /lst/
 .DS_Store
 ram.dump
+
+/src/kernel/interrupt_codes.inc

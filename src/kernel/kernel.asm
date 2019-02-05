@@ -123,15 +123,16 @@ init:
 	jz	.kbdTest
 	ApiCall	INT_API_KEYBOARD, 1
 	push	ax
+	push	ax
 	push	.x
 	call	printf
-	add	sp, 4
+	add	sp, 6
 
 	cmp	ax, '0'
 	je	halt
 	jne	.kbdTest
 
-.x db "Pressed: %c",0xA,0
+.x db "Pressed: %x (%c)",0xA,0
 
 halt:
 	call	Panic

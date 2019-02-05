@@ -1,6 +1,8 @@
 %include "global.inc"
 %include "Interrupt.inc"
 
+InterruptInfo Test
+
 Test:
 	push	ds
 	push	cs

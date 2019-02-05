@@ -13,6 +13,7 @@ else
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
+	PHP		= php
 endif
 
 SRC_DIR		= src
@@ -38,14 +39,18 @@ out/boot.bin: src/boot/* out/kernel.bin
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/boot.lst -I$(SRC_DIR)/boot/ $(SRC_DIR)/boot/boot.asm -o $(OUT_DIR)/boot.bin
 
 # Kernel
-kernel: dirs out/kernel.bin int
+kernel: dirs int int_inc out/kernel.bin
 out/kernel.bin: src/kernel/*
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/kernel.lst -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $(OUT_DIR)/kernel.bin
 
 # Interrupts
 INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
 
-int: dirs ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
+int: dirs int_inc ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
+
+int_inc: src/kernel/interrupt_codes.inc
+src/kernel/interrupt_codes.inc: src/kernel/int/*.asm src/kernel/Memory.asm src/kernel/Terminal.asm
+	php src/int.php > $@
 
 out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $(OUT_DIR)/$(shell basename $< .asm).int
@@ -58,6 +63,7 @@ int_doc: int
 
 clean:
 	rm out/boot.bin out/kernel.bin out/floppy.img out/*.int out/babyOS.html lst/*.lst 2> /dev/null || true
+	rm src/kernel/interrupt_codes.inc 2> /dev/null || true
 	rmdir out lst 2> /dev/null || true
 
 # Emulators
