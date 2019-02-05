@@ -50,7 +50,7 @@ INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
 int: dirs src/kernel/interrupt_codes.inc ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
 
 src/kernel/interrupt_codes.inc: src/kernel/int/*.asm src/kernel/Memory.asm src/kernel/Terminal.asm
-	php src/int.php > $@
+	$(PHP) src/int.php > $@
 
 out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
