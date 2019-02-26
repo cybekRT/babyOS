@@ -1,3 +1,4 @@
+SHELL		= bash
 NASM		= nasm
 BOCHS		= bochs
 #PHP		= php
@@ -20,9 +21,14 @@ SRC_DIR		= src
 OUT_DIR		= out
 LST_DIR		= lst
 
-NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall -D__BASE_FILENAME__="\"$(shell basename $< .asm)\"" -w-other
+NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall -D__BASE_FILENAME__="\"$(shell basename $< .asm)\""
 QEMU_FLAGS	= -hda $(DOS_IMG) -cpu 486 -boot ac -m 2
 BOCHS_FLAGS	= -f bochs.cfg -q
+
+# Suppress warnings 'character constant too long' :/
+ifeq ($(shell echo -e "2.13\n"`nasm -v | cut -f3 -d" "` | sort -V | head -n 1),2.13)
+NASM_FLAGS += -w-other
+endif
 
 all: image 
 #doc
