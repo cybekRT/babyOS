@@ -5,11 +5,6 @@
 ;
 
 InterruptInfo Memory_Init, Memory_GetFree, Memory_AllocSegments, Memory_AllocBytes, Memory_Free, Memory_PrintMap
-API_MEMORY_GET_FREE		equ 0
-API_MEMORY_ALLOC_SEGMENTS	equ 1
-API_MEMORY_ALLOC_BYTES		equ 2
-API_MEMORY_FREE			equ 3
-API_MEMORY_PRINT_MAP		equ 4
 
 struc MemBlock
 	.size resw 1
@@ -456,10 +451,14 @@ Memory_GetFree:
 ;;;;;
 ;
 Memory_PrintMap:
-	rpush	ax, bx, es
+	rpush	ax, bx, ds, es
+
+	push	cs
+	pop	ds
 
 	push	.map
-	call	printf
+	;call	printf
+	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT
 	add	sp, 2
 
 	cmp	word [cs:memBlock], 0
@@ -473,8 +472,10 @@ Memory_PrintMap:
 	push	ax
 	push	es
 	push	.info
-	call	printf
-	add	sp, 6
+	;call	printf
+	push	2
+	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT_ARGS
+	add	sp, 8
 
 	mov	bx, [es:MemBlock.next]
 	cmp	bx, 0
@@ -484,6 +485,6 @@ Memory_PrintMap:
 
 .ret:
 	rpop
-	ret
+	iret
 .map db 'Memory map:',0xA,0
 .info db 0x9,'Block at %x - %ukB',0xA,0

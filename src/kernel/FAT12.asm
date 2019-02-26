@@ -10,7 +10,7 @@ FAT12_Init:
 
 	; Alloc BPB buffer
 	push	512
-	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	add	sp, 2
 	mov	[cs:bpbPtr], ax
 	mov	es, ax
@@ -32,7 +32,7 @@ FAT12_Init:
 
 	; Alloc FAT buffer
 	push	word 512*9 ; FIXME from BPB?
-	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	mov	[cs:fatPtr], ax
 	add	sp, 2
 
@@ -47,7 +47,7 @@ FAT12_Init:
 
 	; Alloc FAT entry buffer
 	push	FAT12_Directory_size
-	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	mov	[cs:fatDirectoryPtr], ax
 	add	sp, 2
 
@@ -79,7 +79,7 @@ FAT12_CloseDirectory:
 	rpush	bp
 
 	push	word [bp + 4]
-	ApiCall	INT_API_MEMORY, API_MEMORY_FREE
+	ApiCall	INT_API_MEMORY, MEMORY_FREE
 	add	sp, 2
 
 	rpop
@@ -208,7 +208,7 @@ ReadWholeFile:
 	add	ax, 511
 	and	ax, 0xfe00
 	push	ax
-	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	add	sp, 2
 
 	mov	di, ax

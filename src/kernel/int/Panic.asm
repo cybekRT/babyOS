@@ -13,18 +13,28 @@ Panic_Init:
 	; Install handler
 	InstallInterrupt	INT_API_PANIC
 
-	retf
+	push	ds
+	push	cs
+	pop	ds
+
+	push	z
+	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT
+	add	sp, 2
+
+	pop	ds
+	iret
 
 z db "Panic test!",0xA,0
 Panic_Panic:
 	push	bp
 	mov	bp, sp
 
-	;push	cs
-	;pop	ds
-	;push	z
-	;ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT
-	;add	sp, 2
+	push	cs
+	call	.afterPushingAddress
+
+.afterPushingAddress:
+	push	bp
+	mov	bp, sp
 
 	; dump
 	push	word [bp+2] ; ip
@@ -43,14 +53,16 @@ Panic_Panic:
 	push	cs
 	pop	ds
 	push	panicMsg
+	push	12
 	;call	printf
-	;ApiCall	INT_API_TERMINAL, API_TERMINAL_PRINT
+	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT_ARGS
+	add	sp, 26
 
 	;call	Memory_PrintMap
+	ApiCall	INT_API_MEMORY, MEMORY_PRINT_MAP
 
 	; Print callstack msg
 	push	callStackMsg
-	;call	printf
 	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT
 	add	sp, 2
 
@@ -62,8 +74,9 @@ Panic_Panic:
 	push	word [bp+2]
 	push	word [bp+4]
 	push	callStackEntryMsg
-	;call	printf
-	add	sp, 8
+	push	3
+	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT_ARGS
+	add	sp, 10
 
 	mov	sp, bp
 	pop	bp
@@ -72,24 +85,20 @@ Panic_Panic:
 
 	; Print footer
 	push	callStackEndMsg
-	;call	printf
 	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT
 	add	sp, 2
 
 .hlt:
-	cli
+	;cli
 	hlt
 	jmp	.hlt
 
 panicMsg db 0xA,'Kernel halted!',0xA,\
 	'Registers:',0xA,\
-	'	AX: %x	BX: %x',0xA,\
-	'	CX: %x	DX: %x',0xA,\
-	'	SI: %x	DI: %x',0xA,\
-	'	SS: %x	SP: %x',0xA,\
-	'	DS: %x	ES: %x',0xA,\
-	'	CS: %x	IP: %x',0xA,0xA,0
+	'	AX: %x	BX: %x	CX: %x	DX: %x',0xA,\
+	'	SI: %x	DI: %x	SS: %x	SP: %x',0xA,\
+	'	DS: %x	ES: %x	CS: %x	IP: %x',0xA,0xA,0
 
 callStackMsg db 0xA,'Call stack:',0xA,0
 callStackEntryMsg db "    ^   (%X:)%X ( %X )",0xA,0
-callStackEndMsg db   "    --     bootloader     --",0xA,0
+callStackEndMsg db   "    --     bootloader     --",0

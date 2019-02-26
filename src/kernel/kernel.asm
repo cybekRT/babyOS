@@ -38,7 +38,7 @@ init:
 
 	; Alloc memory for stack
 	push	2048
-	ApiCall	INT_API_MEMORY, API_MEMORY_ALLOC_BYTES
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	mov	ss, ax
 	mov	sp, 2048
 
@@ -111,11 +111,18 @@ init:
 	;loop	.readLoop
 
 
+
 	;push	word [hdir]
 	;call	FAT12_CloseDirectory
 	;add	sp, 2
 
-	;ApiCall INT_API_PANIC
+	push	word [cs:fatPtr]
+	ApiCall	INT_API_MEMORY, MEMORY_FREE
+
+	push	4096
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+
+	ApiCall INT_API_PANIC
 
 	sti
 .kbdTest:
@@ -140,71 +147,7 @@ halt:
 	call	Panic
 
 Panic:
-	push	bp
-	mov	bp, sp
-
-	; dump
-	push	word [bp+2] ; ip
-	push	cs
-	push	es
-	push	ds
-	push	sp
-	push	ss
-	push	di
-	push	si
-	push	dx
-	push	cx
-	push	bx
-	push	ax
-	push	panicMsg
-	call	printf
-
-	call	Memory_PrintMap
-
-	; Print callstack msg
-	push	callStackMsg
-	call	printf
-	add	sp, 2
-
-	; Print callstack entries
-.csLoop:
-	mov	ax, [bp+2]
-	sub	ax, 0x500
-	push	ax
-	push	word [bp+2]
-	push	word [bp+4]
-	push	callStackEntryMsg
-	call	printf
-	add	sp, 8
-
-	;jmp $
-
-	mov	sp, bp
-	pop	bp
-	test	bp, bp
-	jnz	.csLoop
-
-	; Print footer
-	push	callStackEndMsg
-	call	printf
-	add	sp, 2
-
-	cli
-	hlt
-	jmp	Panic
-
-panicMsg db 0xA,'Kernel halted!',0xA,\
-	'Registers:',0xA,\
-	'	AX: %x	BX: %x',0xA,\
-	'	CX: %x	DX: %x',0xA,\
-	'	SI: %x	DI: %x',0xA,\
-	'	SS: %x	SP: %x',0xA,\
-	'	DS: %x	ES: %x',0xA,\
-	'	CS: %x	IP: %x',0xA,0xA,0
-
-callStackMsg db 0xA,'Call stack:',0xA,0
-callStackEntryMsg db "    ^   (%X:)%X ( %X )",0xA,0
-callStackEndMsg db   "    --     bootloader     --",0xA,0
+	ApiCall INT_API_PANIC
 
 stackEnd: times 2048 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
 stackBegin:
