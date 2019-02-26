@@ -138,10 +138,10 @@ Memory_InitOld:
 	mov	word [es:MemBlock.next], 0
 .ret:
 	push	.hello
-	call	printf
+	;call	printf
 	add	sp, 2
 
-	call	Memory_PrintMap
+	;call	Memory_PrintMap
 
 	ret
 .no_memory:

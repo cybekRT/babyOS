@@ -1,75 +1,10 @@
-%macro InterruptInfo 1-*
-%define INT_MAIN_HANDLER MainHandler_ %+ %1
+%include "interrupt_codes.inc"
 
-; Jump to interrupt installer
-jmp	%1
-
-;%$MainHandler:
-INT_MAIN_HANDLER:
-	cmp	ah, (%0 - 1)
-	jae	%%.fail
-
-	xchg	al, ah
-	xor	ah, ah
-	shl	ax, 2
-	add	ax, %%.jmpTable
-	push	ax
-	ret
-%%.jmpTable:
-%rep (%0-1)
-%rotate 1
-	jmp	%1
-	nop
-%endrep
-%%.fail:
-	stc
-	iret
-%endmacro
-
-%macro InstallInterrupt 1-2
-	push	bx
-	push	es
-
-	mov	bx, 0
-	mov	es, bx
-%if %0 = 1
-	mov	bx, INT_MAIN_HANDLER
-%undef INT_MAIN_HANDLER
-%elif %0 = 2
-	mov	bx, %2
-%else
-%fatal Invalid interrupt installer
-%endif
-
-	mov	word [es:0 + (%1 * 4) + 0], bx
-	mov	bx, cs
-	mov	word [es:0 + (%1 * 4) + 2], bx
-
-%if %0 = 1
-	push	ds
-	push	cs
-	pop	ds
-	push	%1
-	push	%%.msg
-	ApiCall	INT_API_TERMINAL, 1
-	add	sp, 4
-	pop	ds
-
-	jmp	%%.msg_g
-%%.msg:
-%if __BASE_FILENAME__ == "kernel"
-%substr __FILE_BASE__ __FILE__ 12, -5
-db "ISR: ", __FILE_BASE__, " (%X)", 0xA, 0
-%else
-db "ISR: ", __BASE_FILENAME__, " (%X)", 0xA, 0
-%endif
-%%.msg_g:
-
-%endif
-
-	pop	es
-	pop	bx
-%endmacro
+;;;;;;;;;;;;;;;;;;;;
+;
+; IRQs list
+;
+;;;;;;;;;;;;;;;;;;;;
 
 %define IRQ_TIMER	0
 %define IRQ_KEYBOARD	1
@@ -108,6 +43,12 @@ INT_IRQ13	equ 0x75
 INT_IRQ14	equ 0x76
 INT_IRQ15	equ 0x77
 
+;;;;;;;;;;;;;;;;;;;;
+;
+; Interrupts list
+;
+;;;;;;;;;;;;;;;;;;;;
+
 INT_DIVISION_BY_ZERO			equ 0x00
 INT_SINGLE_STEP				equ 0x01
 INT_NONMASKABLE				equ 0x02
@@ -131,12 +72,102 @@ INT_FPU_EXCEPTION			equ 0x13
 INT_VIRTUALIZATION_EXCEPTION		equ 0x14
 INT_CONTROL_PROTECTION_EXCEPTION	equ 0x15
 
-%include "interrupt_codes.inc"
-;INT_API_MEMORY		equ 0x80
-;INT_API_TERMINAL	equ 0x81
-;INT_API_KEYBOARD	equ 0x82
+;;;;;;;;;;;;;;;;;;;;
+;
+; InterruptInfo
+;
+;;;;;;;;;;;;;;;;;;;;
 
-%macro ApiCall 2
+%macro InterruptInfo 1-*
+%define INT_MAIN_HANDLER MainHandler_ %+ %1
+
+; Jump to interrupt installer
+jmp	%1
+
+;%$MainHandler:
+INT_MAIN_HANDLER:
+	cmp	ah, (%0 - 1)
+	jae	%%.fail
+
+	xchg	al, ah
+	xor	ah, ah
+	shl	ax, 2
+	add	ax, %%.jmpTable
+	push	ax
+	ret
+%%.jmpTable:
+%rep (%0-1)
+%rotate 1
+	jmp	%1
+	nop
+%endrep
+%%.fail:
+	stc
+	iret
+%endmacro
+
+;;;;;;;;;;;;;;;;;;;;
+;
+; InstallInterrupt
+;
+;;;;;;;;;;;;;;;;;;;;
+%macro InstallInterrupt 1-2
+	push	bx
+	push	es
+
+	mov	bx, 0
+	mov	es, bx
+%if %0 = 1
+	mov	bx, INT_MAIN_HANDLER
+%undef INT_MAIN_HANDLER
+%elif %0 = 2
+	mov	bx, %2
+%else
+%fatal Invalid interrupt installer
+%endif
+
+	mov	word [es:0 + (%1 * 4) + 0], bx
+	mov	bx, cs
+	mov	word [es:0 + (%1 * 4) + 2], bx
+
+%if %0 = 1
+	push	ds
+	push	cs
+	pop	ds
+	push	%1
+	push	%%.msg
+	push	1
+	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT_ARGS
+	add	sp, 6
+	pop	ds
+
+	jmp	%%.msg_g
+%%.msg:
+%if __BASE_FILENAME__ == "kernel"
+%substr __FILE_BASE__ __FILE__ 12, -5
+db "ISR: ", __FILE_BASE__, " (%X)", 0xA, 0
+%else
+db "ISR: ", __BASE_FILENAME__, " (%X)", 0xA, 0
+%endif
+%%.msg_g:
+
+%endif
+
+	pop	es
+	pop	bx
+%endmacro
+
+;;;;;;;;;;;;;;;;;;;;
+;
+; ApiCall
+;
+;;;;;;;;;;;;;;;;;;;;
+
+%macro ApiCall 1-2
+%if %0 = 1
+	mov	ah, 0
+%else
 	mov	ah, %2
+%endif
 	int	%1
 %endmacro

@@ -20,7 +20,7 @@ SRC_DIR		= src
 OUT_DIR		= out
 LST_DIR		= lst
 
-NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall -D__BASE_FILENAME__="\"$(shell basename $< .asm)\""
+NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall -D__BASE_FILENAME__="\"$(shell basename $< .asm)\"" -w-other
 QEMU_FLAGS	= -hda $(DOS_IMG) -cpu 486 -boot ac -m 2
 BOCHS_FLAGS	= -f bochs.cfg -q
 

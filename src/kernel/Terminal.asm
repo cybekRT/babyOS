@@ -1,6 +1,6 @@
 %define TAB_WIDTH 8
 
-InterruptInfo Terminal_Init, Terminal_INT_Print, Terminal_INT_PrintA1
+InterruptInfo Terminal_Init, Terminal_INT_Print, Terminal_INT_Print_Args
 
 ;terminalX dw 0
 ;terminalY dw 0 
@@ -49,7 +49,13 @@ Terminal_Init:
 .hello db OS_NAME,0xA,0xA,'Terminal initialized!',0xA,0
 ;'babyOS v0.1'
 
+;;;;;;;;;;;;;;;;;;;;
+;
+; 
+;
+;;;;;;;;;;;;;;;;;;;;
 Terminal_INT_Print:
+;	iret
 	rpush	bp, ax, bx, ds
 
 	mov	ax, [bp+8]
@@ -68,16 +74,51 @@ Terminal_INT_Print:
 	rpop
 	iret
 
-Terminal_INT_PrintA1:
-	rpush	bp, ax
+Terminal_INT_Print_Args:
+;iret
+;jmp	Terminal_INT_Print
+;	call	Panic
+;	jmp	Terminal_INT_Print
+;jmp $
+	rpush	bp, ax, bx, cx, dx;, ds
 	;, bx, ds
 
-	mov	ax, [bp+10]
+	xchg	bx, bx
+
+	;push	cs
+	;pop	ds
+
+	mov	cx, [bp+8]
+	inc	cx
+	mov	dx, cx
+
+	mov	bx, bp
+	add	bx, 10
+
+	add	bx, dx
+	add	bx, dx
+	sub	bx, 2
+.repush:
+	mov	ax, [ss:bx]
+	;xchg	bx, bx
 	push	ax
-	mov	ax, [bp+8]
-	push	ax
+	sub	bx, 2
+
+	loop	.repush
+
+	;mov	ax, [bp+10]
+	;push	ax
+	;mov	ax, [bp+8]
+	;push	ax
 	call	Terminal_Print
-	add	sp, 4
+	;add	sp, 4
+	shl	dx, 1
+	add	sp, dx
+
+	xchg	bx, bx
+
+	;mov	sp, bp
+	;sub	sp, 6
 
 	;add	bp, 8
 	;call	Terminal_Print
@@ -229,6 +270,8 @@ Terminal_Scroll:
 ; di		- offset to pointers to variables
 ;
 %define printf Terminal_Print
+;Terminal_PrintZ:
+;	ret
 Terminal_Print:
 	rpush	bp, ax, bx, cx, dx, si, di
 
@@ -240,6 +283,7 @@ Terminal_Print:
 	jz	.vsync
 
 	mov	si, [bp+4]
+	xchg	bx, bx
 	mov	di, bp
 	add	di, 6
 
@@ -317,7 +361,7 @@ Terminal_Print:
 	xchg	dx, ax
 	add	al, '0'
 	dec	bx
-	mov	[bx], al
+	mov	[cs:bx], al
 	mov	ax, dx
 
 	cmp	ax, 0

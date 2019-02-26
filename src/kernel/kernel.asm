@@ -115,6 +115,8 @@ init:
 	;call	FAT12_CloseDirectory
 	;add	sp, 2
 
+	;ApiCall INT_API_PANIC
+
 	sti
 .kbdTest:
 	hlt
@@ -204,6 +206,6 @@ callStackMsg db 0xA,'Call stack:',0xA,0
 callStackEntryMsg db "    ^   (%X:)%X ( %X )",0xA,0
 callStackEndMsg db   "    --     bootloader     --",0xA,0
 
-stackEnd: times 64 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
+stackEnd: times 2048 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
 stackBegin:
 KERNEL_END equ $-$$ + 0x500

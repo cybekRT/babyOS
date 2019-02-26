@@ -5,7 +5,8 @@
                 "kernel.bin": "out/kernel.bin",
                 "int": {
                         "keyboard.int": "out/keyboard.int",
-                        "test.int": "out/test.int"
+                        "test.int": "out/test.int",
+                        "panic.int": "out/panic.int"
                 },
                 "Test1": "lst/boot.lst",
                 "Test2": "lst/boot.lst",
