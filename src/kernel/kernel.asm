@@ -110,8 +110,6 @@ init:
 	jnz	.readLoop
 	;loop	.readLoop
 
-
-
 	;push	word [hdir]
 	;call	FAT12_CloseDirectory
 	;add	sp, 2
@@ -119,7 +117,24 @@ init:
 	push	word [cs:fatPtr]
 	ApiCall	INT_API_MEMORY, MEMORY_FREE
 
-	push	4096
+	;push	4096
+	push	4608
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+
+	push	1
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+
+	push	17
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	push	ax
+
+	push	1
+	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	add	sp, 2
+
+	ApiCall	INT_API_MEMORY, MEMORY_FREE
+
+	push	1
 	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 
 	ApiCall INT_API_PANIC
@@ -138,17 +153,16 @@ init:
 	add	sp, 6
 
 	cmp	ax, '0'
-	je	halt
+	je	Panic
 	jne	.kbdTest
 
 .x db "Pressed: %x (%c)",0xA,0
 
-halt:
-	call	Panic
-
 Panic:
 	ApiCall INT_API_PANIC
 
+
+align 16
 stackEnd: times 2048 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
 stackBegin:
 KERNEL_END equ $-$$ + 0x500

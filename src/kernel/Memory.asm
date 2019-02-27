@@ -11,106 +11,19 @@ struc MemBlock
 	.next resw 1
 endstruc
 
-struc MemoryInfo
-	.base	resq 1
-	.length	resq 1
-	.type	resd 1
-	.unused	resd 1
-endstruc
-
-memoryPoolMaxSize equ 4
-; why memoryPoolMaxSize+1? because if we would like to detect overflow... we must
-memoryPool db 0;times ((memoryPoolMaxSize+1) * MemoryInfo_size) db 0
-memoryPoolSize db 0
-%define memPoolAt(x) (memoryPool + x * MemoryInfo_size)
-
 memBlock dw 0
 
-;;;;;
+;memBlock istruc MemBlock
+;	at MemBlock.size, dw 0
+;	at MemBlock.next, dw 0
+;iend
+
+;;;;;;;;;;;;;;;;;;;;
+;
+; Initialize memory manager
+;
+;;;;;;;;;;;;;;;;;;;;
 Memory_Init:
-	jmp	Memory_InitOld
-	mov	di, 0
-	mov	es, di
-	mov	di, memPoolAt(0)
-	mov	ebx, 0
-	mov	edx, 0x534D4150
-
-.loop:
-	mov	eax, 0xE820
-	mov	ecx, 24
-	int	0x15
-
-	jc	.ret
-	cmp	ebx, 0
-	jz	.ret
-
-	; checks if we have enough memory for entries...
-	movzx	ax, [cs:memoryPoolSize]
-	cmp	ax, memoryPoolMaxSize
-	jae	.fail
-
-	; checks if <1MB
-	cmp	dword [di + MemoryInfo.base+4], 0
-	ja	.loop
-	cmp	dword [di + MemoryInfo.base], 0xfffff
-	ja	.loop
-
-	; check type, if not empty, ignore
-	cmp	dword [di + MemoryInfo.type], 1
-	jne	.loop
-
-	; if base < KERNEL_END, fix it!
-	cmp	dword [di + MemoryInfo.base], KERNEL_END
-	jae	.no_base_fix
-	mov	dword [di + MemoryInfo.base], KERNEL_END
-
-.no_base_fix:
-	; align base to segment
-	add	dword [di + MemoryInfo.base], 0xf
-	shr	dword [di + MemoryInfo.base], 4
-	shr	dword [di + MemoryInfo.length], 4
-
-	push	word [di + MemoryInfo.type+0]
-	push	word [di + MemoryInfo.type+2]
-	push	word [di + MemoryInfo.length+0]
-	push	word [di + MemoryInfo.length+2]
-	push	word [di + MemoryInfo.length+4]
-	push	word [di + MemoryInfo.length+6]
-	push	word [di + MemoryInfo.base+0]
-	push	word [di + MemoryInfo.base+2]
-	push	word [di + MemoryInfo.base+4]
-	push	word [di + MemoryInfo.base+6]
-	push	.text
-	call	printf
-	add	sp, 22
-
-	inc	byte [memoryPoolSize]
-	add	di, MemoryInfo_size
-	jmp	.loop
-.text db 'Base: %x%X%X%X, Length: %x%X%X%X, Type: %x%X',0xA,0
-.hello db 'Memory manager initialized!',0xA,0
-
-.ret:
-	cmp	byte [memoryPoolSize], 0
-	;jz	.no_memory
-	jz	Memory_InitOld
-
-	push	.hello
-	call	printf
-	add	sp, 2
-
-	ret
-; .no_memory:
-; 	push	.nomem
-; 	call	Terminal_Write
-; 	add	sp, 2
-.fail:
-	call	Panic
-
-;;;;;
-;
-;
-Memory_InitOld:
 	InstallInterrupt	INT_API_MEMORY
 
 	int	0x12
@@ -149,9 +62,13 @@ Memory_InitOld:
 .memInfoStr db 'First block: %x, size: %x',0xA,0
 .hello db 'Memory manager initialized!',0xA,0
 
-;;;;;;;;;;
-; (bp+8) - size in bytes
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;
+;
+; Alloc memory
+; Input:
+;	(bp+8) - size in bytes
+;
+;;;;;;;;;;;;;;;;;;;;
 Memory_AllocBytes:
 	push	bp
 	mov	bp, sp
@@ -180,9 +97,13 @@ Memory_AllocBytes:
 	iret
 .info db 'Allocating %u bytes -> ',0,0xA,0
 
-;;;;;;;;;;
-; (bp+8) - (word) size in segments (bytes / 16)
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;
+;
+; Alloc memory
+; Input:
+;	(bp+8) - size in segments (bytes / 16)
+;
+;;;;;;;;;;;;;;;;;;;;
 Memory_AllocSegments:
 	rpush	bp, bx, cx, es, fs, gs
 
@@ -235,6 +156,7 @@ Memory_AllocSegments:
 
 	mov	ax, es
 	cmp	[cs:memBlock], ax
+	;xchg	bx, bx
 	jne	.not_first
 
 	mov	[cs:memBlock], bx
@@ -249,17 +171,9 @@ Memory_AllocSegments:
 	call	printf
 	add	sp, 2
 
-	;call	Memory_PrintMap
-
 	pop	ax
 
 	rpop
-	;pop	gs
-	;pop	fs
-	;pop	es
-	;pop	cx
-	;pop	bx
-	;pop	bp
 	iret
 .fail:
 	push	.nomem
@@ -278,20 +192,26 @@ Memory_AllocSegments:
 ; TODO: fs, gs mustn't be used in 16-bit mode, only qemu allows it...
 ;       oh, they can be... at least PCem allows it, huh. Error was somewhere else :|
 ; FIXME: is it working correctly!?
-;;;;;
-; (bp+8) - segment to free
-;;;;;;
+;;;;;;;;;;;;;;;;;;;;
+;
+; Free allocated memory
+; Input:
+;	(bp+8) - pointer to free
+;
+;;;;;;;;;;;;;;;;;;;;
 Memory_Free:
 	rpush	bp, bx, si, es, fs, gs
 
 	; debug
 	mov	bx, [bp+8]
+	;push	bx
 	dec	bx
 	mov	es, bx
 	push	word [es:MemBlock.size]
+	push	word [bp + 8]
 	push	.info
 	call	printf
-	add	sp, 4
+	add	sp, 6
 
 	mov	si, [bp+8]
 	dec	si
@@ -378,7 +298,7 @@ Memory_Free:
 
 	rpop
 	iret
-.info db 'Freeing %u segments',0xA,0
+.info db 'Freeing %x - %u segments',0xA,0
 ;.firstStr db 'First',0xA,0
 ;.betweenStr db 'Between',0xA,0
 ;.lastStr db 'Last',0xA,0
@@ -427,6 +347,13 @@ Memory_Merge:
 	rpop
 	ret
 
+;;;;;;;;;;;;;;;;;;;;
+;
+; Get free memory in segments
+; Output:
+;	ax - free memory in segments
+;
+;;;;;;;;;;;;;;;;;;;;
 Memory_GetFree:
 	rpush	bx, es
 
@@ -448,8 +375,11 @@ Memory_GetFree:
 	rpop
 	iret
 
-;;;;;
+;;;;;;;;;;;;;;;;;;;;
 ;
+; Prints memory map in terminal
+;
+;;;;;;;;;;;;;;;;;;;;
 Memory_PrintMap:
 	rpush	ax, bx, ds, es
 
@@ -468,11 +398,22 @@ Memory_PrintMap:
 	mov	es, bx
 .loop:
 	mov	ax, [es:MemBlock.size]
+
+	cmp	ax, 256 ; <= 4096
+	jbe	.loop_b
+	jmp	.loop_kb
+.loop_b:
+	shl	ax, 4
+	push	ax
+	push	es
+	push	.infoB
+	jmp	.loop_print
+.loop_kb:
 	shr	ax, 6
 	push	ax
 	push	es
-	push	.info
-	;call	printf
+	push	.infokB
+.loop_print:
 	push	2
 	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT_ARGS
 	add	sp, 8
@@ -487,4 +428,5 @@ Memory_PrintMap:
 	rpop
 	iret
 .map db 'Memory map:',0xA,0
-.info db 0x9,'Block at %x - %ukB',0xA,0
+.infokB db 0x9,'Block at %x - %ukB',0xA,0
+.infoB db 0x9,'Block at %x - %uB',0xA,0

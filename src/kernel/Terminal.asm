@@ -83,7 +83,7 @@ Terminal_INT_Print_Args:
 	rpush	bp, ax, bx, cx, dx;, ds
 	;, bx, ds
 
-	xchg	bx, bx
+	;xchg	bx, bx
 
 	;push	cs
 	;pop	ds
@@ -115,7 +115,7 @@ Terminal_INT_Print_Args:
 	shl	dx, 1
 	add	sp, dx
 
-	xchg	bx, bx
+	;xchg	bx, bx
 
 	;mov	sp, bp
 	;sub	sp, 6
@@ -283,7 +283,7 @@ Terminal_Print:
 	jz	.vsync
 
 	mov	si, [bp+4]
-	xchg	bx, bx
+	;xchg	bx, bx
 	mov	di, bp
 	add	di, 6
 
