@@ -137,7 +137,7 @@ init:
 	push	1
 	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 
-	ApiCall INT_API_PANIC
+	;ApiCall INT_API_PANIC
 
 	sti
 .kbdTest:
