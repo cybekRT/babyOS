@@ -44,8 +44,6 @@ Memory_Init:
 	call	printf
 	add	sp, 2
 
-	;call	Memory_PrintMap
-
 	ret
 .no_memory:
 	push	.nomem
@@ -68,11 +66,6 @@ Memory_AllocBytes:
 	push	bp
 	mov	bp, sp
 
-	push	word [bp + 8]
-	push	.info
-	call	printf
-	add	sp, 4
-
 	add	word [bp+8], 15
 	shr	word [bp+8], 4
 	pop	bp
@@ -90,7 +83,6 @@ Memory_AllocBytes:
 
 	rpop
 	iret
-.info db 'Allocating %u bytes -> ',0,0xA,0
 
 ;;;;;;;;;;;;;;;;;;;;
 ;
@@ -104,12 +96,6 @@ Memory_AllocSegments:
 
 	mov	cx, [bp+8]
 	inc	cx ; cx = size+1, 1 segment more to save size
-
-	; debug
-	push	cx
-	push	.info
-	call	printf
-	add	sp, 4
 
 	; es - current segment
 	; fs - prev segment
@@ -160,13 +146,6 @@ Memory_AllocSegments:
 	inc	ax
 
 .ret:
-	push	ax
-	push	.mem
-	call	printf
-	add	sp, 2
-
-	pop	ax
-
 	rpop
 	iret
 .fail:
@@ -178,7 +157,6 @@ Memory_AllocSegments:
 
 	mov	ax, 0
 	iret
-.info db 'Allocating %u segments: ',0;0xA,0
 .nomem db 'Not enough free memory!',0xA,0
 .mem db '%x',0xA,0
 

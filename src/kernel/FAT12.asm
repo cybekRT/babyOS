@@ -93,13 +93,6 @@ FAT12_CloseDirectory:
 ReadSector:
 	rpush	bp, ax, bx, cx, dx, si, es
 
-	;push	word [bp + 8]
-	;push	word [bp + 4]
-	;push	word [bp + 6]
-	;push	word .msg
-	;call	printf
-	;add	sp, 8
-
 	mov	es, [cs:bpbPtr]
 
 	; LBA 2 CHS
@@ -137,7 +130,6 @@ ReadSector:
 	add	sp, 6
 
 	call	Panic
-.msg db "Reading sector(s: %u): %u -> %x",0xA,0
 .statusMsg db "Status: %x (Drive: %x)",0xA,0
 
 ; ax - cluster
@@ -180,7 +172,6 @@ NextCluster:
 
 	push	word [fatPtr]
 	pop	es
-	;mov	bx, [fat + bx]
 	mov	bx, [es : bx]
 	test	ax, 1
 	jnz	.odd
@@ -235,14 +226,9 @@ ReadWholeFile:
 	pop	ax
 	rpop
 	ret
-;.dataPtr dw 0
 
 FAT12_ReadDirectory:
 	rpush	ax, es
-
-	;push	.readMsg
-	;call	printf
-	;add	sp, 2
 
 	push	word [cs:fatDirectoryPtr]
 	pop	es
@@ -276,7 +262,6 @@ FAT12_ReadDirectory:
 
 	rpop
 	ret
-.readMsg db "Read... ",0
 
 ;;;;;
 ; (bp + 4)--- fatEntry	-	directory entry

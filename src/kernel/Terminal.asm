@@ -2,11 +2,13 @@
 
 InterruptInfo Terminal_Init, Terminal_INT_Print, Terminal_INT_Print_Args
 
-;terminalX dw 0
-;terminalY dw 0 
-
 terminalPos dw 0
 
+;;;;;;;;;;
+;
+; Terminal initialization
+;
+;;;;;;;;;;
 Terminal_Init:
 	; mode 2
 	mov	ah, 0

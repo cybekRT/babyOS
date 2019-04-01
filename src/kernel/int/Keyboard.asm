@@ -1,21 +1,15 @@
 [org 0]
 [bits 16]
 
-;mov	bx, 0xb800
-;mov	es, bx
-;mov	bx, 0
-;mov	byte [es:bx+0], 'x'
-;mov	byte [es:bx+2], 'D'
-;mov	byte [es:bx+4], ' '
-;jmp $
-
 %include "global.inc"
 %include "Interrupt.inc"
 
 InterruptInfo Keyboard_Init, Keyboard_GetBufferLength, Keyboard_GetChar
 
 ;;;;;;;;;;
+;
 ; Interrupt installer
+;
 ;;;;;;;;;;
 Keyboard_Init:
 	rpush	bx, ds
@@ -24,39 +18,17 @@ Keyboard_Init:
 	InstallInterrupt	IRQ2INT(IRQ_KEYBOARD), Keyboard_IRQ_Handler
 	InstallInterrupt	INT_API_KEYBOARD
 
-	;mov	ax, IRQ2INT(IRQ_KEYBOARD)
-	;jmp	$
-	
-	;mov	bx, 0
-	;mov	ds, bx
-	;mov	bx, 9*4
-	;mov	word [ds:bx+0], Keyboard_IRQ_Handler
-	;mov	ax, cs
-	;mov	word [ds:bx+2], ax
-
-xchg bx, bx
-	push	cs
-	pop	ds
-	push	.initMsg
-	ApiCall INT_API_TERMINAL, 0
-	add	sp, 2
-
 	rpop
 	retf
-.initMsg db "INT: keyboard!",0xA,0,0,0
 
 ;;;;;;;;;;
+;
 ; Interrupt handler
+;
 ;;;;;;;;;;
 Keyboard_IRQ_Handler:
 	rpush	ax, bx, cx
-	;, ds
 	pushf
-	;mov	bx, 0
-	;mov	ds, bx
-
-	;push	cs
-	;pop	ds
 
 	mov	al, [cs:kbdBufferBeg]
 	mov	ah, [cs:kbdBufferEnd]
@@ -78,33 +50,8 @@ Keyboard_IRQ_Handler:
 	jmp	.keyReleased
 
 .notEnoughMemory: ; TODO beep
-;	mov	al, 0xb6
-;	out	0x43, al
-;
-;	mov	al, 0x51
-;	out	0x42, al
-;
-;	mov	al, 0x22
-;	out	0x42, al
-;
-;	in	al, 0x61
-;	or	al, 3
-;	out	0x61, al
-;
-;	mov	cx, 0xffff
-;.zz:
-;	push	cx
-;	mov	cx, 0xf
-;.zz2:
-;	loop	.zz2
-;	pop	cx
-;	loop	.zz
-;
-;	and	al, ~3
-;	out	0x61, al
 
 	in	al, 0x60
-
 .keyReleased:
 	mov	al, 0x20
 	out	0x20, al
@@ -114,16 +61,14 @@ Keyboard_IRQ_Handler:
 	iret
 
 ;;;;;;;;;;
+;
 ; Get character
 ; Return:
 ;	al	-	scancode
+;
 ;;;;;;;;;;
 Keyboard_GetChar:
 	rpush	bx
-	;, ds
-
-	;push	cs
-	;pop	ds
 
 	mov	al, [cs:kbdBufferBeg]
 	mov	ah, [cs:kbdBufferEnd]
@@ -147,9 +92,11 @@ Keyboard_GetChar:
 	jmp	.ret
 
 ;;;;;;;;;;
+;
 ; Get characters in buffer
 ; Return:
 ;	ax	-	characters in buffer
+;
 ;;;;;;;;;;
 Keyboard_GetBufferLength:
 	rpush	ds
@@ -160,9 +107,6 @@ Keyboard_GetBufferLength:
 	xor	ah, ah
 	mov	al, [cs:kbdBufferEnd]
 	sub	al, [cs:kbdBufferBeg]
-	;mov	al, [cs:kbdBufferEnd]
-	;mov	ah, [cs:kbdBufferBeg]
-	;sub	al, ah
 	and	ax, (kbdBufferSize - 1)
 
 	rpop
@@ -170,7 +114,5 @@ Keyboard_GetBufferLength:
 
 kbdBufferBeg db 0
 kbdBufferEnd db 0
-;kbdBuffer times 8 db 0
-;kbdBufferSize equ ($ - kbdBuffer) ; Must be power of two
 kbdBufferSize equ 16 ; Must be power of two
 kbdBuffer times kbdBufferSize db 0

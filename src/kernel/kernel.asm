@@ -3,7 +3,8 @@
 [cpu 386]
 
 KERNEL_BEGIN:
-	mov	dl, [0x7C00 + FAT12_BPB.driveNumber]
+	cli
+	;mov	dl, [0x7C00 + FAT12_BPB.driveNumber]
 	mov	[driveNumber], dl
 	mov	bp, 0
 	call	Init
@@ -25,7 +26,6 @@ Init:
 	push	bp
 	mov	bp, sp
 
-	cli
 	mov	bx, 0;cs
 	mov	ds, bx
 	mov	es, bx
@@ -45,10 +45,10 @@ Init:
 	call	FAT12_Init
 	call	FAT12_OpenRoot
 
-	; Read interrupts handlers
 	call	LoadISR
-
 	call	KeyboardTester
+
+	jmp	Panic
 
 ;;;;;;;;;;
 ;
@@ -68,14 +68,6 @@ LoadISR:
 .readLoop:
 	call	FAT12_ReadDirectory
 
-	;mov	bx, [cs:fatEntry]
-	;shl	bx, 4
-	;mov	byte [bx + FAT12_DirectoryEntry.attributes], 0
-	;push	bx
-	;push	printEntryStr
-	;call	printf
-	;add	sp, 4
-
 	push	cx
 	mov	bx, 0
 	mov	ds, bx
@@ -90,7 +82,7 @@ LoadISR:
 	jne	.invalidName
 
 	push	foundIntDirStr
-	call	printf
+	;call	printf
 	add	sp, 2
 
 	call	FAT12_ChangeDirectory
@@ -112,10 +104,6 @@ LoadISR:
 	pop	cx
 	jne	.endOfLoop
 
-	push	word [es : FAT12_DirectoryEntry.size]
-	push	foundIntStr
-	call	printf
-	add	sp, 4
 	call	ReadWholeFile
 
 	push	ax
@@ -163,6 +151,6 @@ KeyboardTester:
 
 
 align 16
-stackEnd: times 2048 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
+stackEnd: times 64 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
 stackBegin:
 KERNEL_END equ $-$$ + 0x500
