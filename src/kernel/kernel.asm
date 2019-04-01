@@ -1,12 +1,12 @@
 [bits 16]
 [org 0x500]
-[CPU 386]
+[cpu 386]
 
 KERNEL_BEGIN:
 	mov	dl, [0x7C00 + FAT12_BPB.driveNumber]
 	mov	[driveNumber], dl
 	mov	bp, 0
-	call	init
+	call	Init
 
 %include "../global.inc"
 %include "Interrupt.inc"
@@ -14,15 +14,14 @@ KERNEL_BEGIN:
 %include "Memory.asm"
 %include "FAT12.asm"
 
-hdir dw 0
-printEntryStr db "File: %s",0xA,0
-INT_DIRECTORY db "INT        "
-INT_EXTENSION db "INT"
-foundIntDirStr db "Found directory: INT",0xA,0
-foundIntStr db "  Found interrupt: %u",0xA,0
 driveNumber db 0
 
-init:
+;;;;;;;;;;
+;
+; Kernel entry point
+;
+;;;;;;;;;;
+Init:
 	push	bp
 	mov	bp, sp
 
@@ -46,6 +45,25 @@ init:
 	call	FAT12_Init
 	call	FAT12_OpenRoot
 
+	; Read interrupts handlers
+	call	LoadISR
+
+	call	KeyboardTester
+
+;;;;;;;;;;
+;
+; Kernel panic
+;
+;;;;;;;;;;
+Panic:
+	ApiCall INT_API_PANIC
+
+;;;;;;;;;;
+;
+; Loading interrupts service routines
+;
+;;;;;;;;;;
+LoadISR:
 	mov	cx, 8
 .readLoop:
 	call	FAT12_ReadDirectory
@@ -68,6 +86,7 @@ init:
 	mov	cx, 11
 	repe	cmpsb
 	pop	cx
+
 	jne	.invalidName
 
 	push	foundIntDirStr
@@ -100,7 +119,7 @@ init:
 	call	ReadWholeFile
 
 	push	ax
-	push	0
+	push	word 0
 	mov	bx, sp
 	call	far [ss:bx]
 	add	sp, 4
@@ -108,43 +127,28 @@ init:
 .endOfLoop:
 	dec	cx
 	jnz	.readLoop
-	;loop	.readLoop
 
-	;push	word [hdir]
-	;call	FAT12_CloseDirectory
-	;add	sp, 2
+	ret
 
-	push	word [cs:fatPtr]
-	ApiCall	INT_API_MEMORY, MEMORY_FREE
+;hdir dw 0
+printEntryStr db "File: %s",0xA,0
+INT_DIRECTORY db "INT        "
+INT_EXTENSION db "INT"
+foundIntDirStr db "Found directory: INT",0xA,0
+foundIntStr db "  Found interrupt: %u",0xA,0
 
-	;push	4096
-	push	4608
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-
-	push	1
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-
-	push	17
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-	push	ax
-
-	push	1
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-	add	sp, 2
-
-	ApiCall	INT_API_MEMORY, MEMORY_FREE
-
-	push	1
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-
-	;ApiCall INT_API_PANIC
-
+;;;;;;;;;;
+;
+; Keyboard testing routine
+;
+;;;;;;;;;;
+KeyboardTester:
 	sti
-.kbdTest:
+.loop:
 	hlt
 	ApiCall	INT_API_KEYBOARD, 0
 	test	ax, ax
-	jz	.kbdTest
+	jz	.loop
 	ApiCall	INT_API_KEYBOARD, 1
 	push	ax
 	push	ax
@@ -154,12 +158,8 @@ init:
 
 	cmp	ax, '0'
 	je	Panic
-	jne	.kbdTest
-
+	jne	.loop
 .x db "Pressed: %x (%c)",0xA,0
-
-Panic:
-	ApiCall INT_API_PANIC
 
 
 align 16

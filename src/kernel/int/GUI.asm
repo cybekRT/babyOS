@@ -10,7 +10,7 @@ GUI_Init:
 	rpush	ax, bx, cx, es
 
 	mov	ax, 0x13
-	int	0x10
+	;int	0x10
 
 	mov	bx, 0xa000
 	mov	es, bx

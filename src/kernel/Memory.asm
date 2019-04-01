@@ -13,11 +13,6 @@ endstruc
 
 memBlock dw 0
 
-;memBlock istruc MemBlock
-;	at MemBlock.size, dw 0
-;	at MemBlock.next, dw 0
-;iend
-
 ;;;;;;;;;;;;;;;;;;;;
 ;
 ; Initialize memory manager
@@ -46,7 +41,7 @@ Memory_Init:
 	mov	word [es:MemBlock.next], 0
 .ret:
 	push	.hello
-	;call	printf
+	call	printf
 	add	sp, 2
 
 	;call	Memory_PrintMap
@@ -156,7 +151,6 @@ Memory_AllocSegments:
 
 	mov	ax, es
 	cmp	[cs:memBlock], ax
-	;xchg	bx, bx
 	jne	.not_first
 
 	mov	[cs:memBlock], bx
@@ -186,12 +180,8 @@ Memory_AllocSegments:
 	iret
 .info db 'Allocating %u segments: ',0;0xA,0
 .nomem db 'Not enough free memory!',0xA,0
-;.mem db 'OK %x',0xA,0
 .mem db '%x',0xA,0
 
-; TODO: fs, gs mustn't be used in 16-bit mode, only qemu allows it...
-;       oh, they can be... at least PCem allows it, huh. Error was somewhere else :|
-; FIXME: is it working correctly!?
 ;;;;;;;;;;;;;;;;;;;;
 ;
 ; Free allocated memory
@@ -229,8 +219,6 @@ Memory_Free:
 
 .loop:
 	; si > es && si < gs
-	; =
-	; 
 
 	mov	bx, gs
 	cmp	bx, si
@@ -253,10 +241,6 @@ Memory_Free:
 	jmp	.loop
 
 .xchg_between:
-	;push	.betweenStr
-	;call	printf
-	;add	sp, 2
-
 	mov	bx, si
 
 	mov	[es:MemBlock.next], si
@@ -266,10 +250,6 @@ Memory_Free:
 	jmp	.ret
 
 .xchg_first:
-	;push	.firstStr
-	;call	printf
-	;add	sp, 2
-
 	mov	bx, [cs:memBlock]
 	mov	es, si
 	mov	[es:MemBlock.next], bx
@@ -278,10 +258,6 @@ Memory_Free:
 	jmp	.ret
 
 .xchg_last:
-	;push	.lastStr
-	;call	printf
-	;add	sp, 2
-
 	mov	[es:MemBlock.next], si
 	mov	gs, si
 	mov	word [gs:MemBlock.next], 0
@@ -299,9 +275,6 @@ Memory_Free:
 	rpop
 	iret
 .info db 'Freeing %x - %u segments',0xA,0
-;.firstStr db 'First',0xA,0
-;.betweenStr db 'Between',0xA,0
-;.lastStr db 'Last',0xA,0
 .curStr db 'Current first block: %x',0xA,0
 
 Memory_Merge:

@@ -7,7 +7,9 @@
 InterruptInfo Panic_Init, Panic_Panic
 
 ;;;;;;;;;;
+;
 ; Interrupt installer
+;
 ;;;;;;;;;;
 Panic_Init:
 	; Install handler
@@ -17,28 +19,27 @@ Panic_Init:
 	push	cs
 	pop	ds
 
-	push	z
+	push	.msg
 	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT
 	add	sp, 2
 
 	pop	ds
-	iret
+	retf
 
-z db "Panic test!",0xA,0
+.msg db "Panic test!",0xA,0
+
+;;;;;;;;;;
+;
+; Kernel panic
+;
+;;;;;;;;;;
 Panic_Panic:
 	push	bp
 	mov	bp, sp
 
-	push	cs
-	call	.afterPushingAddress
-
-.afterPushingAddress:
-	push	bp
-	mov	bp, sp
-
-	; dump
+	; Dump registers
 	push	word [bp+2] ; ip
-	push	cs
+	push	word [bp+4] ; cs
 	push	es
 	push	ds
 	push	sp
@@ -54,12 +55,18 @@ Panic_Panic:
 	pop	ds
 	push	panicMsg
 	push	12
-	;call	printf
 	ApiCall	INT_API_TERMINAL, TERMINAL_INT_PRINT_ARGS
 	add	sp, 26
 
-	;call	Memory_PrintMap
+	; Print memory map
 	ApiCall	INT_API_MEMORY, MEMORY_PRINT_MAP
+
+	; Push address of this ISR
+	push	cs
+	call	.afterPushingAddress
+.afterPushingAddress:
+	push	bp
+	mov	bp, sp
 
 	; Print callstack msg
 	push	callStackMsg
@@ -69,8 +76,15 @@ Panic_Panic:
 	; Print callstack entries
 .csLoop:
 	mov	ax, [bp+2]
+	test	ax, ax
+	jnz	.notZero
+.zero:
+	push	ax
+	jmp	.zero_notZero
+.notZero:
 	sub	ax, 0x500
 	push	ax
+.zero_notZero:
 	push	word [bp+2]
 	push	word [bp+4]
 	push	callStackEntryMsg
@@ -89,7 +103,7 @@ Panic_Panic:
 	add	sp, 2
 
 .hlt:
-	;cli
+	cli
 	hlt
 	jmp	.hlt
 

@@ -17,7 +17,7 @@ Test:
 	add	sp, 2
 
 	pop	ds
-	iret
+	retf
 
 .msg db "Testing... ",0
 
