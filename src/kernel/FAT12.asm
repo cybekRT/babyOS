@@ -5,6 +5,11 @@ fatPtr dw 0
 fatDirectoryPtr dw 0
 fatEntry dw 0
 
+;;;;;;;;;;
+;
+; Initialize FAT12 routines
+;
+;;;;;;;;;;
 FAT12_Init:
 	rpush	ax, bx, cx, dx, es
 
@@ -54,10 +59,14 @@ FAT12_Init:
 	rpop
 	ret
 
-;;;;;
+;;;;;;;;;;
+;
+; Open root directory
+;
 ; Return:
 ;	ax		-	directory handle
-;;;;;
+;
+;;;;;;;;;;
 FAT12_OpenRoot:
 	rpush	es
 
@@ -71,10 +80,14 @@ FAT12_OpenRoot:
 	rpop
 	ret
 
-;;;;;
+;;;;;;;;;;
+;
+; Close directory handle
+;
 ; Arguments:
 ;	(bp + 4)	-	directory handle
-;;;;;
+;
+;;;;;;;;;;
 FAT12_CloseDirectory:
 	rpush	bp
 
@@ -190,7 +203,12 @@ NextCluster:
 	rpop
 	ret
 
-ReadWholeFile:
+;;;;;;;;;;
+;
+; Reads whole file from current directory entry
+;
+;;;;;;;;;;
+FAT12_ReadWholeFile:
 	rpush	bx, es
 
 	push	word [cs:fatEntry]
@@ -227,6 +245,11 @@ ReadWholeFile:
 	rpop
 	ret
 
+;;;;;;;;;;
+;
+; Reads next directory entry
+;
+;;;;;;;;;;
 FAT12_ReadDirectory:
 	rpush	ax, es
 
@@ -263,9 +286,14 @@ FAT12_ReadDirectory:
 	rpop
 	ret
 
-;;;;;
-; (bp + 4)--- fatEntry	-	directory entry
-;;;;;
+;;;;;;;;;;
+;
+; Changes directory to current entry
+;
+; Arguments:
+;	(bp + 4)--- fatEntry	-	directory entry
+;
+;;;;;;;;;;
 FAT12_ChangeDirectory:
 	rpush	bp, ax, es
 

@@ -7,7 +7,8 @@
                         "keyboard.int": "out/Keyboard.int",
                         "test.int": "out/Test.int",
                         "panic.int": "out/Panic.int",
-                        "gui.int": "out/GUI.int"
+                        "gui.int": "out/GUI.int",
+                        "pmode.int": "out/PMode.int",
                 },
                 "Test1": "lst/boot.lst",
                 "Test2": "lst/boot.lst",

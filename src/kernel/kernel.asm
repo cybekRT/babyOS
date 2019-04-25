@@ -4,7 +4,6 @@
 
 KERNEL_BEGIN:
 	cli
-	;mov	dl, [0x7C00 + FAT12_BPB.driveNumber]
 	mov	[driveNumber], dl
 	mov	bp, 0
 	call	Init
@@ -43,7 +42,6 @@ Init:
 
 	; Init FAT12
 	call	FAT12_Init
-	call	FAT12_OpenRoot
 
 	call	LoadISR
 	call	KeyboardTester
@@ -60,10 +58,11 @@ Panic:
 
 ;;;;;;;;;;
 ;
-; Loading interrupts service routines
+; Load interrupts service routines
 ;
 ;;;;;;;;;;
 LoadISR:
+	call	FAT12_OpenRoot
 	mov	cx, 8
 .readLoop:
 	call	FAT12_ReadDirectory
@@ -104,7 +103,7 @@ LoadISR:
 	pop	cx
 	jne	.endOfLoop
 
-	call	ReadWholeFile
+	call	FAT12_ReadWholeFile
 
 	push	ax
 	push	word 0
@@ -151,6 +150,6 @@ KeyboardTester:
 
 
 align 16
-stackEnd: times 64 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
+stackEnd: times 128 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
 stackBegin:
 KERNEL_END equ $-$$ + 0x500
