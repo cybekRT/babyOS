@@ -106,8 +106,9 @@ LoadISR:
 	call	FAT12_ReadWholeFile
 
 	push	ax
-	push	word 0
+	push	word 0x0
 	mov	bx, sp
+	mov	ds, ax
 	call	far [ss:bx]
 	add	sp, 4
 

@@ -1,7 +1,7 @@
 SHELL		= bash
 NASM		= nasm
 BOCHS		= bochs
-#PHP		= php
+PHP		= php
 CFS		= ../cFS/cFS-cli/Debug/cFS-cli
 
 ifeq ($(OS),Windows_NT)
@@ -9,7 +9,8 @@ ifeq ($(OS),Windows_NT)
 	DOS_IMG		= D:\Programs\Qemu\dos.img
 	PCEM		= D:\Programs\PCem\PCem.exe
 	BOCHS		= D:\Programs\Bochs\bochsdbg-p4-smp.exe
-	PHP		= D:/Workspace/babyOS/php.exe
+#	PHP		= D:/Workspace/babyOS/php.exe
+	WATCOM		= D:/Programs/Watcom
 else
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
@@ -51,7 +52,7 @@ out/kernel.bin: src/kernel/*.asm src/kernel/*.inc src/kernel/interrupt_codes.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}} -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $@
 
 # Interrupts
-INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm}
+INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm} ${wildcard ${SRC_DIR}/kernel/int/*.c}
 
 int: dirs src/kernel/interrupt_codes.inc ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
 
@@ -60,6 +61,9 @@ src/kernel/interrupt_codes.inc: src/kernel/int/*.asm src/kernel/Memory.asm src/k
 
 out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
+
+out/%.int: src/kernel/int/%.c src/kernel/*.inc Makefile
+	watcom.cmd $< $(basename $<).obj $@ $(WATCOM)
 
 # Documentation
 doc: dirs int_doc
