@@ -131,6 +131,9 @@ foundIntStr db "  Found interrupt: %u",0xA,0
 ;
 ;;;;;;;;;;
 KeyboardTester:
+	push	cs
+	pop	ds
+
 	sti
 .loop:
 	hlt

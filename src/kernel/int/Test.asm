@@ -21,6 +21,6 @@ Test:
 
 .msg db "Testing... ",0
 
-times 2048 db 0
+times 1024*1 db 0
 
 .msg_far db "Testing!!!",0xA,0

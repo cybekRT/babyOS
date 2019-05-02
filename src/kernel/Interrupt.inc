@@ -86,10 +86,10 @@ jmp	%1
 
 ;%$MainHandler:
 INT_MAIN_HANDLER:
-	cmp	ah, (%0 - 1)
+	cmp	al, (%0 - 1)
 	jae	%%.fail
 
-	xchg	al, ah
+	;xchg	al, ah
 	xor	ah, ah
 	shl	ax, 2
 	add	ax, %%.jmpTable
@@ -165,9 +165,9 @@ db "ISR: ", __BASE_FILENAME__, " (%X)", 0xA, 0
 
 %macro ApiCall 1-2
 %if %0 = 1
-	mov	ah, 0
+	mov	al, 0
 %else
-	mov	ah, %2
+	mov	al, %2
 %endif
 	int	%1
 %endmacro
