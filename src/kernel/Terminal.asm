@@ -15,6 +15,14 @@ Terminal_Init:
 	mov	al, 0x2
 	int	0x10
 
+	; Install int to put char
+	mov	bx, 0
+	mov	es, bx
+	mov	bx, 255
+	shl	bx, 2
+	mov	word [es:bx + 2], 0
+	mov	word [es:bx + 0], Terminal_Put_Old
+
 	; this check doesn't work on AMI 386DX
 	;cmp	al, 0x30
 	;jne	Panic
@@ -150,6 +158,10 @@ Terminal_Write:
 
 ; al - character
 Terminal_Put:
+	int	0xff
+	ret
+Terminal_Put_Old:
+
 	rpush	bx, es
 
 	; Line feed
@@ -175,7 +187,7 @@ Terminal_Put:
 
 .ret:
 	rpop
-	ret
+	iret
 .lf:
 	call	Terminal_LineFeed
 	jmp	.ret

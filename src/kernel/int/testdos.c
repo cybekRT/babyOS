@@ -1,23 +1,37 @@
 int main();
 void __far runtime()
 {
-	main();
-
 	__asm
 	{
-	//	retf
-
-	//	mov	ax, 0
-	//	int	85h
+		//xchg	bx, bx
 	}
 
-	/*for(;;)
+	main();
+
+	/*__asm
+	{
+		xchg	bx, bx
+
+		mov	sp, bp
+		pop	bp
+		retf
+
+		mov	ax, 0
+		int	85h
+	}
+
+	for(;;)
 	{
 		__asm
 		{
 			hlt
 		}
 	}*/
+
+	__asm
+	{
+		//xchg	bx, bx
+	}
 }
 
 #include<i86.h>
@@ -31,14 +45,31 @@ void __far runtime()
 //char __cs tmp[] = "OMG, C is working!";
 char tmp[] = "OMG, C is working!";
 
-void SetVideoMode(char mode)
+int SetVideoMode(char mode)
 {
+	int result = 1;
+
 	__asm
 	{
 		mov	ah, 0
 		mov	al, mode
 		int	10h
+		jnc	ok
+
+		mov	ah, 0
+		mov	al, 0
+		int	10h
+		x:
+		mov	[result], 0
+		//jmp x
+		//mov	sp, bp
+		//mov	ax, 0
+		//ret
+
+		ok:
 	}
+
+	return result;
 }
 
 int IsKeyPressed()
@@ -97,8 +128,48 @@ void PrintNibble(char nibble)
 	cur++;
 }
 
+void PrintChar_Text(char c)
+{
+	static int cur = 0;
+	/*unsigned char __far *p = MK_FP(0xb800, 0x0000);
+
+	unsigned char z = c >> 4;
+	p[cur * 2] = (z < 10) ? z + '0' : z + 'a';
+	z = c & 0x0f;
+	p[cur * 2 + 2] = (z < 10) ? z + '0' : z + 'a';
+	//p[cur * 2 + 1] = 0x73;
+	cur+=2;*/
+
+	__asm
+	{
+		push	bx
+		push	es
+		push	ax
+
+		mov	bx, 0xb800
+		mov	es, bx
+		mov	bx, word ptr cur
+		//shl	bx, 1
+		//mov	al, [c]
+		//mov	es:[bx], al
+		inc	byte ptr es:[bx]
+
+		pop	ax
+		pop	es
+		pop	bx
+	}
+}
+
 void PrintChar(char c)
 {
+	/*__asm
+	{
+		mov	al, [c]
+		int	0xff
+	}
+
+	return;*/
+
 	static int cur = 0;
 	static char _color = 1;
 
@@ -141,6 +212,25 @@ void PrintString(char* str)
 		PrintChar(*str);
 		str++;
 	}
+}
+
+void __interrupt PrintChar_INT(void)
+{
+	uint8_t c = 'x';
+	__asm
+	{
+		xchg	bx, bx
+		mov	[c], al
+	}
+
+	PrintChar_Text(c);
+
+	/*__asm
+	{
+		mov	sp, bp
+		pop	bp
+		iret
+	}*/
 }
 
 int main()
@@ -212,8 +302,18 @@ int main()
 		__asm { hlt }
 	}*/
 
-	SetVideoMode(0x13);
-	p = MK_FP(0xa000, 0x0000);
+	/*if(!SetVideoMode(0x13))
+	{
+		SetVideoMode(3);
+		return 1;
+	}*/
+
+	PrintChar_Text('T');
+	PrintChar_Text('e');
+	PrintChar_Text('s');
+	PrintChar_Text('t');
+
+	/*p = MK_FP(0xa000, 0x0000);
 	for(a = 0; a < 320*200; ++a)
 	{
 		int x = a % 320;
@@ -226,7 +326,7 @@ int main()
 
 		//p[a] = (a % 2 == 1) ? 1 : 2;// font[a];
 		//p[a] = (font[a] >= 0x80) ? 1 : 2;
-	}
+	}*/
 
 	// C64
 	/*for(a = 0; a < 256; ++a)
@@ -254,7 +354,7 @@ int main()
 	}*/
 
 	// TTF
-	for(a = 0; a < 256; ++a)
+	/*for(a = 0; a < 256; ++a)
 	{
 		//int x = a % 16 * fontWidth;
 		//int y = a / 16 * fontWidth;
@@ -277,7 +377,7 @@ int main()
 				p[realY * 320 + realX] = color;
 			}
 		}
-	}
+	}*/
 
 	//fontWidth = 5;
 	//fontHeight = 10;
@@ -312,7 +412,78 @@ int main()
 			for(a = 0; a < 0xffff; ++a);
 	}*/
 
-	PrintString("Welcome to realmode C code!");
+	PrintString("Welcome to realmode C code! :P ");
+
+	{
+		unsigned __far *ivt;
+		unsigned *code_seg;
+
+		ivt = MK_FP(0x0000, 0x0000);
+		code_seg = (void*)0;
+
+		__asm
+		{
+			push	cs
+			pop	[code_seg]
+		}
+
+		PrintNibble(0xaa);
+		PrintNibble(0xaa);
+
+		PrintNibble(((unsigned)code_seg) >> 12);
+		PrintNibble(((unsigned)code_seg) >> 8);
+		PrintNibble(((unsigned)code_seg) >> 4);
+		PrintNibble(((unsigned)code_seg) >> 0);
+
+		PrintNibble(0xaa);
+		PrintNibble(0xaa);
+
+		PrintNibble(((unsigned)PrintChar_INT) >> 12);
+		PrintNibble(((unsigned)PrintChar_INT) >> 8);
+		PrintNibble(((unsigned)PrintChar_INT) >> 4);
+		PrintNibble(((unsigned)PrintChar_INT) >> 0);
+
+		PrintNibble(0xaa);
+		PrintNibble(0xaa);
+
+		/*for(;;)
+		{
+			__asm
+			{
+				cli
+				hlt
+			}
+		}*/
+
+		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 12);
+		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 8);
+		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 4);
+		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 0);
+
+		PrintNibble(0xaa);
+		PrintNibble(0xaa);
+
+		ivt[255 * 2] = PrintChar_INT;
+		ivt[255 * 2 + 1] = code_seg;
+
+		__asm
+		{
+			xchg bx, bx
+
+			mov	al, ' '
+			int	0xff
+			mov	al, ':'
+			int	0xff
+			mov	al, ')'
+			int	0xff
+			mov	al, ' '
+			int	0xff
+		}
+
+		PrintString("Now in color :)");
+
+		return 0;
+	}
 
 	for(;;)
 	{

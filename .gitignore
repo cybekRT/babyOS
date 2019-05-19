@@ -3,5 +3,15 @@
 /lst/
 .DS_Store
 ram.dump
+*.obj
+*.err
 
 /src/kernel/interrupt_codes.inc
+
+/src/data/font
+/src/data/font.asm
+/src/data/font.bin
+/src/data/font.bmp
+/src/data/font.exe
+/src/data/font.h
+/src/data/font.obj

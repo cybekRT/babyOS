@@ -112,6 +112,8 @@ LoadISR:
 	call	far [ss:bx]
 	add	sp, 4
 
+	;xchg bx, bx
+
 .endOfLoop:
 	dec	cx
 	jnz	.readLoop

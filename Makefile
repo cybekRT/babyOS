@@ -16,6 +16,7 @@ else
 	QEMU		= qemu-system-i386
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
 	PHP		= php
+	WATCOM		= D:/Programs/Watcom
 endif
 
 SRC_DIR		= src
@@ -63,7 +64,8 @@ out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
 
 out/%.int: src/kernel/int/%.c src/kernel/*.inc Makefile
-	watcom.cmd $< $(basename $<).obj $@ $(WATCOM)
+	wine cmd /c watcom.cmd $< $(basename $<).obj $@ $(WATCOM) 2>/dev/null || true
+	rm $(basename $<).obj
 
 # Documentation
 doc: dirs int_doc
