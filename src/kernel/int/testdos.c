@@ -207,6 +207,7 @@ void PrintChar(char c)
 	unsigned pitch = fontHeight;
 	unsigned dx, dy;
 	int lineWidth = (fontWidth != 0) ? 320 / fontWidth : 0;
+	_color = 3;
 
 	//fontWidth = 5;
 	//fontHeight = 12;
@@ -522,7 +523,7 @@ int main()
 			for(a = 0; a < 0xffff; ++a);
 	}*/
 
-	PrintString("Welcome to realmode C code! :P ");
+	PrintString("Welcome to realmode C code!\n");
 
 	{
 		unsigned __far *ivt;
@@ -576,7 +577,7 @@ int main()
 		ivt[255 * 2] = PrintChar_INT;
 		ivt[255 * 2 + 1] = code_seg;
 
-		__asm
+		/*__asm
 		{
 			xchg bx, bx
 
@@ -588,9 +589,9 @@ int main()
 			int	0xff
 			mov	al, ' '
 			int	0xff
-		}
+		}*/
 
-		PrintString("Now in color :)");
+		//PrintString("Now in color :)");
 
 		return 0;
 	}
