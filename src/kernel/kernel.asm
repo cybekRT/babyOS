@@ -143,12 +143,14 @@ KeyboardTester:
 	test	ax, ax
 	jz	.loop
 	ApiCall	INT_API_KEYBOARD, 1
+	push ax
 	push	ax
 	push	ax
 	push	.x
 	call	printf
 	add	sp, 6
 
+pop ax
 	cmp	ax, '0'
 	je	Panic
 	jne	.loop

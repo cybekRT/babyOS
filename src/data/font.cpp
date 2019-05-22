@@ -19,7 +19,9 @@ int main()
 	TTF_Init();
 
 	printf("Opening font\n");
-	TTF_Font* font = TTF_OpenFont("font.ttf", 9);
+	TTF_Font* font = TTF_OpenFont("font.ttf", 10);
+	//TTF_Font* font = TTF_OpenFont("Andale Mono.ttf", 9);
+	//TTF_Font* font = TTF_OpenFont("fixedsys.ttf", 10);
 	SDL_Color fontColor = { 255, 255, 255, 255 };
 
 	char text[256 + 1] = {0};

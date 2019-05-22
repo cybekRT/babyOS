@@ -130,7 +130,7 @@ void PrintNibble(char nibble)
 
 void PrintChar_Text(char c)
 {
-	static int cur = 0;
+	volatile static int cur = 0;
 	/*unsigned char __far *p = MK_FP(0xb800, 0x0000);
 
 	unsigned char z = c >> 4;
@@ -142,6 +142,8 @@ void PrintChar_Text(char c)
 
 	__asm
 	{
+xchg	bx, bx
+
 		push	bx
 		push	es
 		push	ax
@@ -150,14 +152,40 @@ void PrintChar_Text(char c)
 		mov	es, bx
 		mov	bx, word ptr cur
 		//shl	bx, 1
-		//mov	al, [c]
-		//mov	es:[bx], al
-		inc	byte ptr es:[bx]
+		mov	al, byte ptr c
+		//xchg bx, bx
+		mov	byte ptr es:bx, al
+		//inc	byte ptr es:[bx] 
 
 		pop	ax
 		pop	es
 		pop	bx
 	}
+
+	cur += 2;
+}
+
+//int cur = 0;
+
+void ScrollTerminal()
+{
+	unsigned lineWidth = (fontWidth != 0) ? 320 / fontWidth : 0;
+	unsigned char __far *src = MK_FP(0xA000, 320 * fontHeight);
+	unsigned char __far *dst = MK_FP(0xA000, 0x0000);
+	unsigned int linesPerScreen = 200 / fontHeight;
+	unsigned int a;
+
+	for(a = 0; a < 320 * (linesPerScreen - 1) * fontHeight; a++)
+	{
+		dst[a] = src[a];
+	}
+
+	for(a = 0; a < 320 * fontHeight; a++)
+	{
+		dst[320 * fontHeight * (linesPerScreen - 1) + a] = 0;
+	}
+
+	cur -= lineWidth;
 }
 
 void PrintChar(char c)
@@ -170,7 +198,7 @@ void PrintChar(char c)
 
 	return;*/
 
-	static int cur = 0;
+	//static int cur = 0;
 	static char _color = 1;
 
 	unsigned char __far *p = MK_FP(0xa000, 0x0000);
@@ -178,7 +206,52 @@ void PrintChar(char c)
 	//unsigned pitch = fontWidth * fontHeight;
 	unsigned pitch = fontHeight;
 	unsigned dx, dy;
-	int lineWidth = 320 / fontWidth;
+	int lineWidth = (fontWidth != 0) ? 320 / fontWidth : 0;
+
+	//fontWidth = 5;
+	//fontHeight = 12;
+	//lineWidth = (fontWidth != 0) ? 320 / fontWidth : 0;
+
+	if(fontWidth == 0)
+	{
+		for(;;)
+		{
+			__asm
+			{
+				xchg bx, bx
+				cli
+				hlt
+			}
+		}
+	}
+
+	if(c == '\r')
+	{
+		cur -= cur % lineWidth;
+		return;
+	}
+	else if(c == '\n')
+	{
+		cur -= cur % lineWidth;
+		cur += lineWidth;
+
+		_color++;
+		_color = _color % 15 + 1;
+
+		if(cur / lineWidth >= 200 / fontHeight)
+		{
+			ScrollTerminal();
+		}
+
+		return;
+	}
+	else if(c == '\t')
+	{
+		const int tabWidth = 4;
+		cur -= cur % tabWidth;
+		cur += tabWidth;
+		return;
+	}
 
 	for(dy = 0; dy < fontHeight; dy++)
 	{
@@ -201,8 +274,14 @@ void PrintChar(char c)
 	}
 
 	cur++;
-	_color++;
-	_color = _color % 15 + 1;
+
+	if(cur / lineWidth >= 200 / fontHeight)
+	{
+		ScrollTerminal();
+	}
+
+	//_color++;
+	//_color = _color % 15 + 1;
 }
 
 void PrintString(char* str)
@@ -214,13 +293,30 @@ void PrintString(char* str)
 	}
 }
 
-void __interrupt PrintChar_INT(void)
+__declspec(naked) void __interrupt PrintChar_INT(void)
 {
-	uint8_t c = 'x';
+	volatile uint8_t c = 'x';
 	__asm
 	{
-		xchg	bx, bx
-		mov	[c], al
+		push	ax
+		push	bx
+		push	cx
+		push	dx
+		push	si
+		push	di
+		push	bp
+		push	ds
+		
+		push	cs
+		pop	ds
+
+		//xchg	bx, bx
+		mov	byte ptr c, al
+
+		//push    0
+		push	byte ptr c
+		call PrintChar
+		add	sp, 2
 	}
 
 	PrintChar_Text(c);
@@ -231,6 +327,19 @@ void __interrupt PrintChar_INT(void)
 		pop	bp
 		iret
 	}*/
+
+	__asm
+	{
+		pop	ds
+		pop	bp
+		pop	di
+		pop	si
+		pop	dx
+		pop	cx
+		pop	bx
+		pop	ax
+		iret
+	}
 }
 
 int main()
@@ -302,11 +411,12 @@ int main()
 		__asm { hlt }
 	}*/
 
-	/*if(!SetVideoMode(0x13))
+	cur = 0;
+	if(!SetVideoMode(0x13))
 	{
 		SetVideoMode(3);
 		return 1;
-	}*/
+	}
 
 	PrintChar_Text('T');
 	PrintChar_Text('e');
