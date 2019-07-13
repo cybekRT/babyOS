@@ -9,7 +9,7 @@ ifeq ($(OS),Windows_NT)
 	DOS_IMG		= D:\Programs\Qemu\dos.img
 	PCEM		= D:\Programs\PCem\PCem.exe
 	BOCHS		= D:\Programs\Bochs\bochsdbg-p4-smp.exe
-#	PHP		= D:/Workspace/babyOS/php.exe
+	PHP			= D:/Workspace/babyOS/php.exe
 	WATCOM		= D:/Programs/Watcom
 else
 	DOS_IMG		= ~/dos.img
@@ -64,8 +64,9 @@ out/%.int: src/kernel/int/%.asm src/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
 
 out/%.int: src/kernel/int/%.c src/kernel/*.inc Makefile
-	wine cmd /c watcom.cmd $< $(basename $<).obj $@ $(WATCOM) 2>/dev/null || true
-	rm $(basename $<).obj
+	rm $(basename $<).obj 2>/dev/null || true
+	./watcom.cmd $< $(basename $<).obj $@ $(WATCOM) 2>/dev/null
+#wine cmd /c watcom.cmd $< $(basename $<).obj $@ $(WATCOM) 2>/dev/null || true
 
 # Documentation
 doc: dirs int_doc
