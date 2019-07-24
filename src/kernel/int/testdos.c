@@ -199,7 +199,7 @@ void PrintChar(char c)
 	return;*/
 
 	//static int cur = 0;
-	static char _color = 1;
+	static char _color = 10;
 
 	unsigned char __far *p = MK_FP(0xa000, 0x0000);
 
@@ -207,7 +207,7 @@ void PrintChar(char c)
 	unsigned pitch = fontHeight;
 	unsigned dx, dy;
 	int lineWidth = (fontWidth != 0) ? 320 / fontWidth : 0;
-	_color = 3;
+	//_color = 6;
 
 	//fontWidth = 5;
 	//fontHeight = 12;
@@ -236,8 +236,8 @@ void PrintChar(char c)
 		cur -= cur % lineWidth;
 		cur += lineWidth;
 
-		_color++;
-		_color = _color % 15 + 1;
+		//_color++;
+		//_color = _color % 15 + 1;
 
 		if(cur / lineWidth >= 200 / fontHeight)
 		{
@@ -526,8 +526,8 @@ int main()
 	PrintString("Welcome to realmode C code!\n");
 
 	{
-		unsigned __far *ivt;
-		unsigned *code_seg;
+		void __far **ivt;
+		void *code_seg;
 
 		ivt = MK_FP(0x0000, 0x0000);
 		code_seg = (void*)0;
@@ -538,7 +538,7 @@ int main()
 			pop	[code_seg]
 		}
 
-		PrintNibble(0xaa);
+		/*PrintNibble(0xaa);
 		PrintNibble(0xaa);
 
 		PrintNibble(((unsigned)code_seg) >> 12);
@@ -564,7 +564,7 @@ int main()
 				cli
 				hlt
 			}
-		}*/
+		}* /
 
 		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 12);
 		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 8);
@@ -572,7 +572,7 @@ int main()
 		PrintNibble(((unsigned)&ivt[255 * 2+1]) >> 0);
 
 		PrintNibble(0xaa);
-		PrintNibble(0xaa);
+		PrintNibble(0xaa);*/
 
 		ivt[255 * 2] = PrintChar_INT;
 		ivt[255 * 2 + 1] = code_seg;
