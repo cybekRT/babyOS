@@ -19,7 +19,8 @@ int main()
 	TTF_Init();
 
 	printf("Opening font\n");
-	TTF_Font* font = TTF_OpenFont("font.ttf", 10);
+	TTF_Font* font = TTF_OpenFont("PressStart2P-Regular.ttf", 8);
+	//TTF_Font* font = TTF_OpenFont("joystix monospace.ttf", 8);
 	//TTF_Font* font = TTF_OpenFont("Andale Mono.ttf", 9);
 	//TTF_Font* font = TTF_OpenFont("fixedsys.ttf", 10);
 	SDL_Color fontColor = { 255, 255, 255, 255 };
@@ -30,12 +31,42 @@ int main()
 	text[0] = ' ';
 
 	printf("Rendering\n");
-	SDL_Surface* fontSrf = TTF_RenderText_Solid(font, text, fontColor);
-	int fontWidth = fontSrf->w / 256;
-	int fontHeight = fontSrf->h;
+	SDL_Surface* fontSrf[256];
+	int maxWidth = 0, maxHeight = 0;
+	for(int a = 1; a < 256; a++)
+	{
+		//printf("A = %d\n", a);
+		text[0] = a; text[1] = 0;
+		fontSrf[a] = TTF_RenderText_Solid(font, text, fontColor);
+		if(fontSrf[a]->w > maxWidth)
+			maxWidth = fontSrf[a]->w;
+		if(fontSrf[a]->h > maxHeight)
+			maxHeight = fontSrf[a]->h;
+	}
+
+	//printf("Rendering\n");
+	//SDL_Surface* fontSrf = TTF_RenderText_Solid(font, text, fontColor);
+	int fontWidth = maxWidth;// fontSrf->w / 256;
+	int fontHeight = maxHeight;// fontSrf->h;
+
+	if(fontWidth > 8)
+	{
+		printf("Font too large, oopsie!\n");
+		return 1;
+	}
+
 	printf("Creating surface\n");
-	SDL_Surface* fontSrf8 = SDL_CreateRGBSurface(0, fontSrf->w, fontSrf->h, 8, 0xff, 0xff, 0xff, 0x000000);
-	SDL_BlitSurface(fontSrf, NULL, fontSrf8, NULL);
+	SDL_Surface* fontSrf8 = SDL_CreateRGBSurface(0, 256 * fontWidth, fontHeight, 8, 0xff, 0xff, 0xff, 0x000000);
+	for(int a = 0; a < 256; a++)
+	{
+		SDL_Rect dst;
+		dst.x = a * fontWidth;
+		dst.y = 0;
+		dst.w = fontWidth;
+		dst.h = fontHeight;
+		SDL_BlitSurface(fontSrf[a], NULL, fontSrf8, &dst);
+	}
+	
 
 	/*SDL_Surface* fontSrf8 = SDL_CreateRGBSurface(0, 320, 100, 10, 0xff, 0xff, 0xff, 0x000000);
 	for(unsigned y = 0; y < 16; ++y)
@@ -84,7 +115,7 @@ int main()
 	//fontBin.write((char*)fontSrf8->pixels, fontSrf8->w * fontSrf8->h);
 	fontBin.close();
 
-	printf("Creating bin file\n");
+	printf("Creating asm file\n");
 	std::ofstream fontAsm("font.asm");
 	fontAsm << "[bits 16]\n[section _DATA class=DATA]\n\n\nglobal _fontWidth\nglobal _fontHeight\nglobal _font" << "\n";
 	fontAsm << "align 8\n_fontWidth: db " << std::to_string(fontWidth) << "\n";
