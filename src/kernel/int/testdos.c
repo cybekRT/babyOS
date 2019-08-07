@@ -526,8 +526,8 @@ int main()
 	PrintString("Welcome to realmode C code!\n");
 
 	{
-		void __far **ivt;
-		void *code_seg;
+		uint16_t __far *ivt;
+		uint16_t *code_seg;
 
 		ivt = MK_FP(0x0000, 0x0000);
 		code_seg = (void*)0;
