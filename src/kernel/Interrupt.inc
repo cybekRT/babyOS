@@ -1,4 +1,4 @@
-%include "interrupt_codes.inc"
+;%include "interrupt_codes.inc"
 
 ;;;;;;;;;;;;;;;;;;;;
 ;
