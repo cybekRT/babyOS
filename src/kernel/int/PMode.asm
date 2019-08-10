@@ -35,6 +35,7 @@ struc GDT
 	.base_24_31 resb 1
 endstruc
 
+align 16
 v_gdt:
 dq 0
 istruc GDT
@@ -56,6 +57,7 @@ istruc GDT
 iend
 v_gdt_end
 
+align 16
 gdt_desc:
 	dw (v_gdt_end - v_gdt)
 	dd v_gdt
@@ -72,31 +74,49 @@ PMode_Init:
 
 	cli
 	mov	ax, 0
-	int	10h
-
-	mov	ax, 0
-	mov	ds, ax
+	;int	10h
 
 	xchg	bx, bx
-
-	;lgdt	[gdt_desc]
-	mov	eax, cs
+	mov	eax, 0
+	mov	ax, cs
 	shl	eax, 4
-	add	eax, gdt_desc
-	lgdt	[eax]
-	jmp	0x8:PMode
+	add	[gdt_desc + 2], eax
 
-	rpop
+	xchg	bx, bx
+	lgdt	[gdt_desc]
+
+	mov	eax, cr0
+	or	eax, 1
+	mov	cr0, eax
+
+	push	0x8
+	pop	ds
+
+	mov	ax, cs
+	shl	ax, 4
+	add	ax, X_PMode
+	push	word 0x8
+	push	word ax
+
 	retf
+	rpop
 
 [bits 32]
-PMode:
+X_PMode:
+	xchg	bx, bx
 	mov	eax, 0xb8000
+	mov	byte [eax+0], 'P'
+	mov	byte [eax+2], 'M'
+	mov	byte [eax+4], ' '
 
-	mov	byte [eax+0], 'e'
-	mov	byte [eax+2], 'P'
-	mov	byte [eax+4], 'm'
-	mov	byte [eax+6], ' '
+	mov	eax, 0xa0000
+	mov	bl, 0
+	mov	ecx, 320*200
+.loop:
+	mov	[eax], bl
+	inc	eax
+	add	bl, 1
+	loop	.loop
 
 	hlt
-	jmp	PMode
+	jmp X_PMode

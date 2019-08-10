@@ -14,6 +14,7 @@ InterruptInfo Panic_Init, Panic_Panic
 Panic_Init:
 	; Install handler
 	InstallInterrupt	INT_API_PANIC
+	;InstallInterrupt	INT_DOUBLE_FAULT, Panic_Panic
 
 	push	ds
 	push	cs

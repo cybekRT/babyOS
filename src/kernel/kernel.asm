@@ -62,10 +62,10 @@ Init:
 	call	LoadISR
 
 	;jmp $
-	jmp	KeyboardTester
+	;jmp	KeyboardTester
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	mov	ax, 0
+	mov	ax, 3
 	int	10h
 
 	xor ax, ax
@@ -77,6 +77,9 @@ Init:
 	mov	eax, cr0
 	or	eax, 1
 	mov	cr0, eax
+
+	push	0x10
+	pop	ds
 
 	jmp	0x8:X_PMode
 
@@ -139,6 +142,7 @@ X_PMode:
 	mov	byte [eax+2], 'M'
 	mov	byte [eax+4], ' '
 
+	xchg	bx, bx
 	hlt
 	jmp X_PMode
 [bits 16]
@@ -250,7 +254,7 @@ KeyboardTester:
 	call	printf
 	add	sp, 6
 
-pop ax
+	pop ax
 	cmp	ax, '0'
 	je	Panic
 	jne	.loop
