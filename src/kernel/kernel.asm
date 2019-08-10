@@ -120,73 +120,28 @@ PMode_main:
 	mov	word [eax + IDT.selector], 0x8
 	mov	byte [eax + IDT.flags], (IDT_FLAG_32BIT_INT_GATE | IDT_FLAG_STORAGE_SEGMENT | IDT_FLAG_RING_0 | IDT_FLAG_ENTRY_PRESENT)
 
-	mov	eax, 0xa0000
-	mov	ecx, 320*200
-	mov	byte [eax+0], 'P'
-	mov	byte [eax+2], 'M'
-	mov	byte [eax+4], ' '
+	;mov	eax, 0xa0000
+	;mov	ecx, 320*200
+	;mov	byte [eax+0], 'P'
+	;mov	byte [eax+2], 'M'
+	;mov	byte [eax+4], ' '
 
-.loop:
-	mov	byte [eax], 0x3
-	inc	eax
-	loop	.loop
+;.loop:
+;	mov	byte [eax], 0x3
+;	inc	eax
+;	loop	.loop
 
 	;xchg	bx, bx
 	;int	0
 
 	call	Terminal_Init
 
-	mov	ecx, 64
-.x
-	push	'0'
-	call	Terminal_Put
-	push	'1'
-	call	Terminal_Put
-	push	'2'
-	call	Terminal_Put
-	push	'3'
-	call	Terminal_Put
-	push	'4'
-	call	Terminal_Put
-	push	'5'
-	call	Terminal_Put
-	push	'6'
-	call	Terminal_Put
-	push	'7'
-	call	Terminal_Put
-	push	'8'
-	call	Terminal_Put
-	push	'9'
-	call	Terminal_Put
-	push	'A'
-	call	Terminal_Put
-	push	'B'
-	call	Terminal_Put
-	push	'C'
-	call	Terminal_Put
-	push	'D'
-	call	Terminal_Put
-	push	'E'
-	call	Terminal_Put
-	push	'F'
-	call	Terminal_Put
-	add	esp, 64
+	push	.helloMsg
+	call	Terminal_Print
 
-	dec	ecx
-	jnz	.x
-
-	xchg	bx, bx
 	hlt
 	jmp PMode_main
-
-INT_0:
-	rpush	eax
-
-	mov	eax, 0xa0000
-	mov	byte [eax], 0
-
-	rpop
-	iret
+.helloMsg db OS_NAME,0xA,0xA,0
 
 INT_0D:
 	mov	eax, 0xa0000
@@ -195,10 +150,11 @@ INT_0D:
 	mov	dword [eax+8], 0
 	mov	dword [eax+16], 0
 
-	jmp	$
+	hlt
+	jmp	INT_0D
 
 align 16
-stackEnd: times 256 db 0 ; If stack is too small, callStackEndMsg will be overwritten... 32 is too small
+stackEnd: times 256 db 0
 stackBegin:
 
 %include "Terminal.asm"

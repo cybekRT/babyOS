@@ -1,5 +1,5 @@
 ;[bits 16]
-%define OS_NAME 'babyOS v0.1'
+%define OS_NAME 'babyOS v32.0'
 
 %macro rpush 0-*
 %push stackframe
