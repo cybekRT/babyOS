@@ -9,6 +9,7 @@
 #include<SDL/SDL_ttf.h>
 #include<cstdio>
 #include<fstream>
+#include<iomanip>
 
 #undef main
 int main()
@@ -122,6 +123,30 @@ int main()
 	fontAsm << "align 8\n_fontHeight: db " << std::to_string(fontHeight) << "\n";
 	fontAsm << "align 8\n_font: incbin \"font.bin\"\n";
 	fontAsm.close();
+
+	std::ofstream fontDef("font.def");
+	fontDef << "fontWidth equ " << std::to_string(fontWidth) << "\n";
+	fontDef << "fontHeight equ " << std::to_string(fontHeight) << "\n";
+	fontDef << "font: db ";
+
+	std::ifstream fontDefIn("font.bin", std::ios::binary);
+	for(;;)
+	{
+		static bool first = true;
+
+		int c = 0;
+		fontDefIn.read((char*)&c, 1);
+		if(fontDefIn.eof())
+			break;
+
+		if(!first)
+			fontDef << ", ";
+		
+		fontDef << "0x" << std::setbase(16) << c;
+		first = false;
+	}
+	fontDef << "\n";
+	fontDef.close();
 
 	printf("Creating header file\n");
 	std::ofstream fontHeader("font.h");

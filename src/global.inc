@@ -1,4 +1,4 @@
-[bits 16]
+;[bits 16]
 %define OS_NAME 'babyOS v0.1'
 
 %macro rpush 0-*
@@ -9,6 +9,9 @@
 		push	%1
 		%ifidni %1, bp
 			mov	bp, sp
+		%endif
+		%ifidni %1, ebp
+			mov	ebp, esp
 		%endif
 		%rotate 1
 	%endrep

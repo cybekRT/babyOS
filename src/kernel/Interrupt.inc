@@ -1,10 +1,10 @@
 ;%include "interrupt_codes.inc"
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; IRQs list
 ;
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 %define IRQ_TIMER	0
 %define IRQ_KEYBOARD	1
@@ -43,11 +43,11 @@ INT_IRQ13	equ 0x75
 INT_IRQ14	equ 0x76
 INT_IRQ15	equ 0x77
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Interrupts list
 ;
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 INT_DIVISION_BY_ZERO			equ 0x00
 INT_SINGLE_STEP				equ 0x01
@@ -72,11 +72,11 @@ INT_FPU_EXCEPTION			equ 0x13
 INT_VIRTUALIZATION_EXCEPTION		equ 0x14
 INT_CONTROL_PROTECTION_EXCEPTION	equ 0x15
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; InterruptInfo
 ;
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 %macro InterruptInfo 1-*
 %define INT_MAIN_HANDLER MainHandler_ %+ %1
@@ -106,11 +106,11 @@ INT_MAIN_HANDLER:
 	iret
 %endmacro
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; InstallInterrupt
 ;
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro InstallInterrupt 1-2
 	push	bx
 	push	es
@@ -157,11 +157,11 @@ db "ISR: ", __BASE_FILENAME__, " (%X)", 0xA, 0
 	pop	bx
 %endmacro
 
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; ApiCall
 ;
-;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 %macro ApiCall 1-2
 %if %0 = 1
