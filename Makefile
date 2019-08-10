@@ -43,13 +43,13 @@ out/floppy.img: src/floppy.json boot kernel
 
 # Bootloader
 boot: dirs out/boot.bin
-$(OUT_DIR)/boot.bin: $(SRC_DIR)/boot/boot.asm
+out/boot.bin: $(SRC_DIR)/boot/boot.asm $(SRC_DIR)/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}} $< -o $@
 # -I$(SRC_DIR)/boot/
 
 # Kernel
 kernel: dirs int out/kernel.bin
-out/kernel.bin: src/kernel/*.asm src/kernel/*.inc #src/kernel/interrupt_codes.inc
+out/kernel.bin: src/kernel/*.asm src/kernel/*.inc $(SRC_DIR)/*.inc #src/kernel/interrupt_codes.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}} -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $@
 
 # Interrupts
