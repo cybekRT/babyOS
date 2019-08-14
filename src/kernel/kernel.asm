@@ -27,7 +27,7 @@ Init:
 	mov	ss, bx
 	mov	sp, stackBegin
 
-	xchg	bx, bx
+	;xchg	bx, bx
 	call	Memory_PreInit
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -120,8 +120,12 @@ PMode_main:
 	call	Memory_Init
 
 	; End of kernel, halt :(
+	push	.end_of_kernel
+	call	Terminal_Print
+	sti
 	hlt
-	jmp PMode_main
+	jmp	$-1
+.end_of_kernel db 0xA,"Kernel halted... :(",0
 
 INT_0D:
 	xchg	bx, bx
@@ -154,13 +158,9 @@ INT_0D:
 	add	edi, 320
 	loop	.right_loop
 
-	;mov	dword [eax+0], 0
-	;mov	dword [eax+4], 0
-	;mov	dword [eax+8], 0
-	;mov	dword [eax+16], 0
-
+	cli
 	hlt
-	jmp	INT_0D
+	jmp	$-1
 .msg db 0xA,"General protection fault!",0xA,0
 
 Panic:
