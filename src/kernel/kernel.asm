@@ -3,7 +3,6 @@
 [cpu 386]
 
 KERNEL_BEGIN:
-	cli
 	mov	[driveNumber], dl
 	call	Init
 
@@ -21,71 +20,28 @@ driveNumber db 0
 ;
 ;;;;;;;;;;
 Init:
+	cli
+
 	mov	bx, 0
 	mov	ds, bx
 	mov	es, bx
 	mov	ss, bx
 	mov	sp, stackBegin
 
-	;xchg	bx, bx
-	call	Memory_PreInit
-
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	; Init mode 13h
 	mov	ax, 0x13
 	int	0x10
 
-	lgdt	[GDT_Handle]
-	lidt	[IDT_Handle]
+	; 16-bit initialization
+	call	Memory_PreInit
+	call	GDT_PreInit
+	call	IDT_PreInit
 
 	mov	eax, cr0
 	or	eax, 1
 	mov	cr0, eax
 
-	jmp	0x8:PMode_main
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Global Descriptor Table
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-GDT_data:
-dq 0
-istruc GDT
-	at GDT.limit_0_15, dw 0xffff
-	at GDT.base_0_15, dw 0
-	at GDT.base_16_23, db 0
-	at GDT.flags, db (GDT_FLAG_CODE_READ | GDT_FLAG_SEG_CODE | GDT_FLAG_SEG_CODE_OR_DATA | GDT_FLAG_RING_0 | GDT_FLAG_ENTRY_PRESENT)
-	at GDT.limit_16_19_attributes, db 0xF | (GDT_ATTRIBUTE_32BIT_SIZE | GDT_ATTRIBUTE_GRANULARITY)
-	at GDT.base_24_31, db 0
-iend
-
-istruc GDT
-	at GDT.limit_0_15, dw 0xffff
-	at GDT.base_0_15, dw 0
-	at GDT.base_16_23, db 0
-	at GDT.flags, db (GDT_FLAG_DATA_WRITE | GDT_FLAG_SEG_DATA | GDT_FLAG_SEG_CODE_OR_DATA | GDT_FLAG_RING_0 | GDT_FLAG_ENTRY_PRESENT)
-	at GDT.limit_16_19_attributes, db 0xF | (GDT_ATTRIBUTE_32BIT_SIZE | GDT_ATTRIBUTE_GRANULARITY)
-	at GDT.base_24_31, db 0
-iend
-GDT_data_end:
-
-GDT_Handle:
-	dw (GDT_data_end - GDT_data)
-	dd GDT_data
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Interrupt Description Table
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-IDT_data:
-times 256*IDT_size db 0
-IDT_data_end:
-
-IDT_Handle:
-	dw (IDT_data_end - IDT_data)
-	dd IDT_data
+	jmp	0x8:Init32
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -93,7 +49,7 @@ IDT_Handle:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 [bits 32]
-PMode_main:
+Init32:
 	mov	bx, 0x10
 	mov	ds, bx
 	mov	es, bx
@@ -102,18 +58,8 @@ PMode_main:
 	mov	ss, bx
 	mov	esp, stackBegin
 
-	; Set general protection fault ISR
-	mov	eax, IDT_data
-	add	eax, IDT_size * INT_GENERAL_PROTECTION_FAULT
-
-	mov	ebx, INT_0D
-
-	mov	word [eax + IDT.offset_0_15], bx
-	shl	ebx, 16
-	mov	word [eax + IDT.offset_16_31], bx
-
-	mov	word [eax + IDT.selector], 0x8
-	mov	byte [eax + IDT.flags], (IDT_FLAG_32BIT_INT_GATE | IDT_FLAG_STORAGE_SEGMENT | IDT_FLAG_RING_0 | IDT_FLAG_ENTRY_PRESENT)
+	call	GDT_Init
+	call	IDT_Init
 
 	; Initialize kernel main services
 	call	Terminal_Init
@@ -122,18 +68,26 @@ PMode_main:
 	; End of kernel, halt :(
 	push	.end_of_kernel
 	call	Terminal_Print
-	sti
 	hlt
 	jmp	$-1
 .end_of_kernel db 0xA,"Kernel halted... :(",0
 
-INT_0D:
-	xchg	bx, bx
-
-	push	.msg
+Panic:
+	pushf
+	push	dword [esp + 4]
+	push	esp
+	push	ebp
+	push	edi
+	push	esi
+	push	edx
+	push	ecx
+	push	ebx
+	push	eax
+	push	.panicMsg
 	call	Terminal_Print
-	add	esp, 4
+	add	esp, 11*4
 
+.background:
 	mov	al, 12
 	; top
 	mov	edi, 0xa0000
@@ -158,26 +112,31 @@ INT_0D:
 	add	edi, 320
 	loop	.right_loop
 
+	; Halt
 	cli
 	hlt
 	jmp	$-1
-.msg db 0xA,"General protection fault!",0xA,0
 
-Panic:
-	push	.msg
-	call	Terminal_Print
-.loop:
-	cli
-	hlt
-	jmp	.loop
-
-
-.msg db "Kernal panic...",0
+.panicMsg
+db "Kernel panic...",0xA,0xA
+db "  EAX:   %p",0xA
+db "  EBX:   %p",0xA
+db "  ECX:   %p",0xA
+db "  EDX:   %p",0xA
+db "  ESI:   %p",0xA
+db "  EDI:   %p",0xA
+db "  EBP:   %p",0xA
+db "  ESP:   %p",0xA
+db "  EIP:   %p",0xA
+db "  Flags: %x"
+db 0
 
 align 16
 stackEnd: times 256 db 0
 stackBegin:
 
+%include "GDT.asm"
+%include "IDT.asm"
 %include "Terminal.asm"
 %include "Memory.asm"
 

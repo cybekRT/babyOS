@@ -11,7 +11,6 @@ backgroundColor db 0x18
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Terminal_Init:
-
 	mov	al, [backgroundColor]
 	mov	ecx, 320*200
 	mov	edi, 0xa0000
@@ -123,14 +122,19 @@ Terminal_Put:
 	cmp	word [cursorX], 320 / fontWidth - 1
 	jne	.exit
 
+	call	Terminal_LF
+	jmp	.exit
+
 	mov	word [cursorX], 0
 	inc	word [cursorY]
 	mov	ax, [cursorY]
 	mov	bx, fontHeight
 	mul	bx
+	add	ax, fontHeight / 2
 	add	ax, fontHeight - 1
-	cmp	ax, 200
-	jbe	.exit
+	;cmp	ax, 200 - (fontHeight / 2) * 2
+	cmp	ax, 160
+	jb	.exit
 
 	dec	word [cursorY]
 	call	Terminal_Scroll
@@ -146,9 +150,11 @@ Terminal_LF:
 	mov	bx, fontHeight
 	mul	bx
 	add	ax, fontHeight - 1
-	cmp	ax, 200
+	add	ax, (fontHeight / 2)
+	cmp	ax, 200 - (fontHeight / 2)
 	jbe	.exit
 
+	dec	word [cursorY]
 	call	Terminal_Scroll
 .exit:
 	ret
@@ -158,9 +164,18 @@ Terminal_CR:
 	ret
 
 Terminal_Scroll:
+	xchg	bx, bx
+
 	; Scroll
-	mov	esi, 0xa0000 + 320 * fontHeight
-	mov	edi, 0xa0000
+	mov	esi, 0xa0000 + 320 * (fontHeight + fontHeight / 2)
+	; mov	edi, 0xa0000 + 320 * fontHeight / 2 != mov	edi, 0xa0000 + 320 * (fontHeight / 2)
+	;mov	edi, 0xa0000 + 320 * fontHeight / 2
+	mov	edi, 0xa0000 + 320 * (fontHeight / 2)
+	;dw 320 * fontHeight / 2
+	;dw 320 * (fontHeight / 2)
+	;dw 5 * fontHeight / 2
+	;dw 5 * (fontHeight / 2)
+	;dw fontHeight
 	mov	ecx, 320 * (200 / fontHeight - 1) * fontHeight
 	rep movsb
 	; Clear line
@@ -257,7 +272,7 @@ Terminal_Print:
 
 .special_p:
 	mov	eax, [ebp + edi]
-	xchg	bx, bx
+	;xchg	bx, bx
 
 	push	dword '0'
 	call	Terminal_Put
@@ -283,12 +298,12 @@ Terminal_Print:
 
 .special_u:
 	mov	eax, [ebp + edi]
-	xchg	bx, bx
+	;xchg	bx, bx
 	jmp	.special_d_no_minus
 
 .special_d:
 	mov	eax, [ebp + edi]
-	xchg	bx, bx
+	;xchg	bx, bx
 
 	cmp	eax, 0
 	jge	.special_d_no_minus
