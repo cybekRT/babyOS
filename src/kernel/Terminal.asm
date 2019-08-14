@@ -17,7 +17,12 @@ Terminal_Init:
 	mov	edi, 0xa0000
 	rep stosb
 
+	push	.helloMsg
+	call	Terminal_Print
+	add	esp, 4
+
 	ret
+.helloMsg db OS_NAME,0xA,0xA,0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -59,6 +64,7 @@ Terminal_Put:
 	mov	ax, [cursorY]
 	mov	bx, fontHeight
 	mul	bx
+	add	ax, fontHeight / 2
 
 	mov	bx, 320
 	mul	bx
@@ -69,6 +75,7 @@ Terminal_Put:
 	mov	ax, [cursorX]
 	mov	bx, fontWidth
 	mul	bx
+	add	ax, fontWidth / 2
 
 	movzx	eax, ax
 	pop	edx
@@ -118,7 +125,7 @@ Terminal_Put:
 	;mov	bx, [cursorY]
 	;inc	ax
 	inc	word [cursorX]
-	cmp	word [cursorX], 320 / fontWidth
+	cmp	word [cursorX], 320 / fontWidth - 1
 	jne	.exit
 
 	;mov	ax, 0

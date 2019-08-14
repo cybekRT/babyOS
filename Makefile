@@ -8,7 +8,7 @@ ifeq ($(OS),Windows_NT)
 	QEMU		= D:\Programs\Qemu\qemu-system-i386
 	DOS_IMG		= D:\Programs\Qemu\dos.img
 	PCEM		= D:\Programs\PCem\PCem.exe
-	BOCHS		= D:\Programs\Bochs\bochsdbg-p4-smp.exe
+	BOCHS		= D:\Programs\Bochs\bochsdbg-p4-smp.exe -f bochs-win.bxrc
 	PHP		= D:/Workspace/babyOS/php.exe
 	WATCOM		= D:/Programs/Watcom
 else
@@ -17,6 +17,7 @@ else
 	PCEM		= wine ~/Downloads/PCem/PCem.exe
 	PHP		= php
 	WATCOM		= D:/Programs/Watcom
+	BOCHS		= bochs -f bochs.cfg
 endif
 
 SRC_DIR		= src
@@ -25,7 +26,7 @@ LST_DIR		= lst
 
 NASM_FLAGS	= -I$(SRC_DIR)/ -O0 -Wall -D__BASE_FILENAME__="\"$(shell basename $< .asm)\""
 QEMU_FLAGS	= -hda $(DOS_IMG) -cpu 486 -boot ac -m 2
-BOCHS_FLAGS	= -f bochs.cfg -q
+BOCHS_FLAGS	= -q
 
 # Suppress warnings 'character constant too long' :/
 ifeq ($(shell echo -e "2.13\n"`nasm -v | cut -f3 -d" "` | sort -V | head -n 1),2.13)

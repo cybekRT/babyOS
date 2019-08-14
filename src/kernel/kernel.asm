@@ -27,6 +27,9 @@ Init:
 	mov	ss, bx
 	mov	sp, stackBegin
 
+	xchg	bx, bx
+	call	Memory_PreInit
+
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	mov	ax, 0x13
 	int	0x10
@@ -77,15 +80,6 @@ GDT_Handle:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 IDT_data:
-
-;istruc IDT
-;	at IDT.offset_0_15, dw INT_0
-;	at IDT.selector, dw 0x8
-;	at IDT.unused, db 0
-;	at IDT.flags, db (IDT_FLAG_32BIT_INT_GATE | IDT_FLAG_STORAGE_SEGMENT | IDT_FLAG_RING_0 | IDT_FLAG_ENTRY_PRESENT)
-;	at IDT.offset_16_31, dw 0
-;iend
-
 times 256*IDT_size db 0
 IDT_data_end:
 
@@ -108,6 +102,7 @@ PMode_main:
 	mov	ss, bx
 	mov	esp, stackBegin
 
+	; Set general protection fault ISR
 	mov	eax, IDT_data
 	add	eax, IDT_size * INT_GENERAL_PROTECTION_FAULT
 
@@ -120,43 +115,70 @@ PMode_main:
 	mov	word [eax + IDT.selector], 0x8
 	mov	byte [eax + IDT.flags], (IDT_FLAG_32BIT_INT_GATE | IDT_FLAG_STORAGE_SEGMENT | IDT_FLAG_RING_0 | IDT_FLAG_ENTRY_PRESENT)
 
-	;mov	eax, 0xa0000
-	;mov	ecx, 320*200
-	;mov	byte [eax+0], 'P'
-	;mov	byte [eax+2], 'M'
-	;mov	byte [eax+4], ' '
-
-;.loop:
-;	mov	byte [eax], 0x3
-;	inc	eax
-;	loop	.loop
-
-	;xchg	bx, bx
-	;int	0
-
+	; Initialize kernel main services
 	call	Terminal_Init
+	call	Memory_Init
 
-	push	.helloMsg
-	call	Terminal_Print
-
+	; End of kernel, halt :(
 	hlt
 	jmp PMode_main
-.helloMsg db OS_NAME,0xA,0xA,0
 
 INT_0D:
-	mov	eax, 0xa0000
-	mov	dword [eax+0], 0
-	mov	dword [eax+4], 0
-	mov	dword [eax+8], 0
-	mov	dword [eax+16], 0
+	xchg	bx, bx
+
+	push	.msg
+	call	Terminal_Print
+	add	esp, 4
+
+	mov	al, 12
+	; top
+	mov	edi, 0xa0000
+	mov	ecx, 320
+	rep	stosb
+	; bottom
+	mov	edi, 0xa0000 + 199*320
+	mov	ecx, 320
+	rep	stosb
+	; left
+	mov	edi, 0xa0000
+	mov	ecx, 200
+.left_loop:
+	mov	[edi], al
+	add	edi, 320
+	loop	.left_loop
+	; right
+	mov	edi, 0xa0000 + 319
+	mov	ecx, 200
+.right_loop:
+	mov	[edi], al
+	add	edi, 320
+	loop	.right_loop
+
+	;mov	dword [eax+0], 0
+	;mov	dword [eax+4], 0
+	;mov	dword [eax+8], 0
+	;mov	dword [eax+16], 0
 
 	hlt
 	jmp	INT_0D
+.msg db 0xA,"General protection fault!",0xA,0
+
+Panic:
+	push	.msg
+	call	Terminal_Print
+.loop:
+	cli
+	hlt
+	jmp	.loop
+
+
+.msg db "Kernal panic...",0
 
 align 16
 stackEnd: times 256 db 0
 stackBegin:
 
 %include "Terminal.asm"
+%include "Memory.asm"
 
 KERNEL_END equ $-$$ + 0x500
