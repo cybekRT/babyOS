@@ -65,6 +65,32 @@ Init32:
 	call	Terminal_Init
 	call	Memory_Init
 
+	call	Memory_PrintInfo
+
+	; Alloc
+	push	2048
+	call	Memory_Alloc
+	add	esp, 4
+	call	Memory_PrintInfo
+
+	; Alloc
+	push	1024
+	call	Memory_Alloc
+	add	esp, 4
+	call	Memory_PrintInfo
+
+	; Free
+	push	32
+	call	Memory_Free
+	add	esp, 4
+	call	Memory_PrintInfo
+
+	; Free
+	push	32+2048+8
+	call	Memory_Free
+	add	esp, 4
+	call	Memory_PrintInfo
+
 	; End of kernel, halt :(
 	push	.end_of_kernel
 	call	Terminal_Print
@@ -117,8 +143,7 @@ Panic:
 	hlt
 	jmp	$-1
 
-.panicMsg
-db "Kernel panic...",0xA,0xA
+.panicMsg db "Kernel panic...",0xA,0xA
 db "  EAX:   %p",0xA
 db "  EBX:   %p",0xA
 db "  ECX:   %p",0xA
