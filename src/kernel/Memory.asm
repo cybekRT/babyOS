@@ -87,8 +87,11 @@ Memory_Init:
 	mov	eax, [MEM_MAP + MEMMap_t.base]
 	test	eax, eax
 	jnz	.no_zero
-	add	dword [MEM_MAP + MEMMap_t.base], 32
-	sub	dword [MEM_MAP + MEMMap_t.length], 32
+	;add	dword [MEM_MAP + MEMMap_t.base], 32
+	;sub	dword [MEM_MAP + MEMMap_t.length], 32
+	
+	mov	dword [MEM_MAP + MEMMap_t.base], KERNEL_END
+	sub	dword [MEM_MAP + MEMMap_t.length], KERNEL_END
 
 .no_zero:
 	mov	ecx, [MEM_MAP_entries]
@@ -159,6 +162,7 @@ Memory_InitSort:
 	add	edi, MEMMap_t_size
 
 	; TODO: qemu's entries don't overlap... if you find overlapping, implement sorting and diving them... :|
+	; TODO FIXME: omg... I should exclude kernel's memory from 'unused' area... T__T
 	;mov	eax, [MEM_MAP + esi + MEMMap_t.base]
 	;cmp	eax, [MEM_MAP + edi + MEMMap_t.base]
 	mov	al, [MEM_MAP + esi + MEMMap_t.type]
@@ -259,7 +263,7 @@ Memory_InitInternal:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Memory_Alloc:
-	rpush	ebp, edx, esi, edi
+	rpush	ebp, ebx, edx, esi, edi
 
 	mov	edx, [ebp + 8]
 	add	edx, MEM_Handle_t_size

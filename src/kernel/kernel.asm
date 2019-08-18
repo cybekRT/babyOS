@@ -50,6 +50,8 @@ Init:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 [bits 32]
 Init32:
+	;xchg bx, bx
+
 	mov	bx, 0x10
 	mov	ds, bx
 	mov	es, bx
@@ -67,48 +69,70 @@ Init32:
 	call	Memory_Init
 
 	; Alloc stack
-	push	8192
-	call	Memory_Alloc
-	add	eax, 8192
-	mov	esp, eax
+	;push	8192
+	;call	Memory_Alloc
+	;add	eax, 8192
+	;mov	esp, eax
+
+	;xchg bx, bx
 
 	; Initialize rest of kernel services
 	call	Timer_Init
+	call	Process_Init
 
-	; Alloc
-	push	2048
-	call	Memory_Alloc
+	;cli
+	;hlt
+
+	; ; Alloc
+	; push	2048
+	; call	Memory_Alloc
+	; add	esp, 4
+	; call	Memory_PrintInfo
+
+	; ; Alloc
+	; push	1024
+	; call	Memory_Alloc
+	; add	esp, 4
+	; call	Memory_PrintInfo
+
+	; ; Free
+	; push	32+8
+	; call	Memory_Free
+	; add	esp, 4
+	; call	Memory_PrintInfo
+
+	; ; Free
+	; push	32+8+2048+8
+	; call	Memory_Free
+	; add	esp, 4
+	; call	Memory_PrintInfo
+
+	;push	.yolo
+	;call	Terminal_Print
+	;add	esp, 4
+
+	; Spawn some processes...
+	push	dword PidA
+	call	Process_Spawn
 	add	esp, 4
-	call	Memory_PrintInfo
 
-	; Alloc
-	push	1024
-	call	Memory_Alloc
+	push	PidB
+	call	Process_Spawn
 	add	esp, 4
-	call	Memory_PrintInfo
-
-	; Free
-	push	32+8
-	call	Memory_Free
-	add	esp, 4
-	call	Memory_PrintInfo
-
-	; Free
-	push	32+8+2048+8
-	call	Memory_Free
-	add	esp, 4
-	call	Memory_PrintInfo
-
-	sti
-.xxx:
-	push	dword [tmp_value]
-	push	.tmp
-	call	Terminal_Print
-	add	esp, 8
 
 	xchg bx, bx
+	sti
+.xxx:
+	push	dword [tmp_value2]
+	push	dword [tmp_value1]
+	push	dword [tmp_value]
+	push	.tmp
+	;call	Terminal_Print
+	add	esp, 16
+
+	;xchg bx, bx
 	push	dword 1000
-	call	Timer_Delay
+	;call	Timer_Delay
 	add	esp, 4
 
 	inc	dword [tmp_value]
@@ -122,8 +146,29 @@ Init32:
 	hlt
 	jmp	$-1
 .end_of_kernel db 0xA,"Kernel halted... :(",0
-.tmp db "Value: %p",0xD,0
+.tmp db "Value: (%p) %u - %u",0xD,0
+.yolo db 0xA,"====================",0xA,"=       SPAWN      =",0xA,"====================",0xA,0xA,0
 tmp_value dd 0
+tmp_value1 dd 0
+tmp_value2 dd 0
+
+PidA:
+	sti
+	push	1000
+	call	Timer_Delay
+	add	esp, 4
+
+	inc	dword [tmp_value1]
+	jmp	PidA
+
+PidB:
+	sti
+	push	3000
+	call	Timer_Delay
+	add	esp, 4
+
+	inc	dword [tmp_value2]
+	jmp	PidB
 
 Panic:
 	pushf
@@ -184,13 +229,18 @@ db "  Flags: %x"
 db 0
 
 align 16
-stackEnd: times 256 db 0
+times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
+stackEnd:
+times 512 db 0
 stackBegin:
+times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 
 %include "GDT.asm"
 %include "IDT.asm"
 %include "Terminal.asm"
 %include "Memory.asm"
 %include "Timer.asm"
+%include "Process.asm"
 
+align 32
 KERNEL_END equ $-$$ + 0x500

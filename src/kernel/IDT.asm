@@ -29,20 +29,62 @@ IDT_PreInit:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 IDT_Init:
+	; Initialize PICs
+	mov	al, 0x11
+	out	PIC0_PORT_CMD, al
+
+	mov	al, INT_PIC0_OFFSET
+	out	PIC0_PORT_DATA, al
+
+	mov	al, 4
+	out	PIC0_PORT_DATA, al
+
+	mov	al, 1
+	out	PIC0_PORT_DATA, al
+
+	mov	al, 0x11
+	out	PIC1_PORT_CMD, al
+
+	mov	al, INT_PIC0_OFFSET
+	out	PIC1_PORT_DATA, al
+
+	mov	al, 2
+	out	PIC1_PORT_DATA, al
+
+	mov	al, 1
+	out	PIC1_PORT_DATA, al
+
 	; Set general protection fault ISR
-	mov	eax, IDT_data
-	add	eax, IDT_size * INT_GENERAL_PROTECTION_FAULT
+	push	dword INT_GENERAL_PROTECTION_FAULT
+	push	ISR_GeneralProtectionFault
+	call	IDT_RegisterISR
+	add	esp, 8
 
-	mov	ebx, ISR_GeneralProtectionFault
+	push	dword 0x27
+	push	ISR_DUMMY
+	call	IDT_RegisterISR
+	add	esp, 8
 
-	mov	word [eax + IDT.offset_0_15], bx
-	shl	ebx, 16
-	mov	word [eax + IDT.offset_16_31], bx
-
-	mov	word [eax + IDT.selector], 0x8
-	mov	byte [eax + IDT.flags], (IDT_FLAG_32BIT_INT_GATE | IDT_FLAG_STORAGE_SEGMENT | IDT_FLAG_RING_0 | IDT_FLAG_ENTRY_PRESENT)
+	
+	push	dword INT_INVALID_OPCODE
+	push	ISR_DUMMY2
+	call	IDT_RegisterISR
+	add	esp, 8
 
 	ret
+
+ISR_DUMMY:
+	mov	al, 0x20
+	out	0x20, al
+	iret
+
+ISR_DUMMY2:
+	cli
+	xchg bx, bx
+	hlt
+	jmp ISR_DUMMY2
+
+	iret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
