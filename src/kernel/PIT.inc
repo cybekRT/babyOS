@@ -1,0 +1,26 @@
+PIT_PORT_CHANNEL_0	equ 0x40
+PIT_PORT_CHANNEL_1	equ 0x41
+PIT_PORT_CHANNEL_2	equ 0x42
+PIT_PORT_COMMAND	equ 0x43
+
+PIT_COMMAND_CHANNEL_0	equ 0b00 << 6
+PIT_COMMAND_CHANNEL_1	equ 0b01 << 6
+PIT_COMMAND_CHANNEL_2	equ 0b10 << 6
+PIT_COMMAND_CHANNEL_RB	equ 0b11 << 6
+
+PIT_COMMAND_AMODE_LATCH_COUNT	equ 0b00 << 4
+PIT_COMMAND_AMODE_LOBYTE	equ 0b01 << 4
+PIT_COMMAND_AMODE_HIBYTE	equ 0b10 << 4
+PIT_COMMAND_AMODE_LOHIBYTE	equ 0b11 << 4
+
+PIT_COMMAND_OPMODE_0		equ 0b11 << 1 ; (interrupt on terminal count)
+PIT_COMMAND_OPMODE_1		equ 0b11 << 1 ; hardware re-triggerable one-shot)
+PIT_COMMAND_OPMODE_2		equ 0b11 << 1 ; (rate generator)
+PIT_COMMAND_OPMODE_3		equ 0b11 << 1 ; (square wave generator)
+PIT_COMMAND_OPMODE_4		equ 0b11 << 1 ; (software triggered strobe)
+PIT_COMMAND_OPMODE_5		equ 0b11 << 1 ; (hardware triggered strobe)
+PIT_COMMAND_OPMODE_2_ALT	equ 0b11 << 1 ; 
+PIT_COMMAND_OPMODE_3_ALT	equ 0b11 << 1 ; 
+
+PIT_COMMAND_BMODE_BINARY	equ 0b0 << 0
+PIT_COMMAND_BMODE_BCD		equ 0b1 << 0

@@ -46,15 +46,66 @@ IDT_Init:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
+; Register ISR
+; Arguments:
+; 	(ebp + 12)	- interrupt id
+; 	(ebp + 8)	- handler
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+IDT_RegisterISR:
+	rpush	ebp, eax, ebx, edx
+
+	;xchg	bx, bx
+	mov	eax, [ebp + 12]
+	mov	ebx, IDT_size
+	mul	ebx
+	add	eax, IDT_data
+
+	mov	ebx, [ebp + 8]
+
+	mov	word [eax + IDT.offset_0_15], bx
+	shl	ebx, 16
+	mov	word [eax + IDT.offset_16_31], bx
+
+	mov	word [eax + IDT.selector], 0x8
+	mov	byte [eax + IDT.flags], (IDT_FLAG_32BIT_INT_GATE | IDT_FLAG_STORAGE_SEGMENT | IDT_FLAG_RING_0 | IDT_FLAG_ENTRY_PRESENT)
+
+	rpop
+	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; ISR - General Protection Fault
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ISR_GeneralProtectionFault:
+	rpush	ebp, eax, ecx, esi, edi
 	xchg	bx, bx
+	;jmp	Panic
 
 	push	.msg
 	call	Terminal_Print
 	add	esp, 4
+
+	; Selector index
+	mov	eax, [ebp + 4]
+	shr	eax, 3
+	push	eax
+
+	; IDT/GDT/LDT table
+	mov	eax, [ebp + 4]
+	shr	eax, 1
+	and	eax, 0b11
+	push	eax
+
+	; External
+	mov	eax, [ebp + 4]
+	and	eax, 1
+	push	eax
+
+	push	.msgCode
+	call	Terminal_Print
+	add	esp, 16
 
 	mov	al, 12
 	; top
@@ -80,9 +131,12 @@ ISR_GeneralProtectionFault:
 	add	edi, 320
 	loop	.right_loop
 
-	call	Panic
+	rpop
+	add	esp, 4 ; remove error code from stack
+	jmp	Panic
 
 	cli
 	hlt
 	jmp	$-1
 .msg db 0xA,"General protection fault!",0xA,0
+.msgCode db "  Ext: %b, Type: %b, Index: %u",0xA,0

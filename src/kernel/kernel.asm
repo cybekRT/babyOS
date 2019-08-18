@@ -58,6 +58,7 @@ Init32:
 	mov	ss, bx
 	mov	esp, stackBegin
 
+	; Init CPU
 	call	GDT_Init
 	call	IDT_Init
 
@@ -65,7 +66,14 @@ Init32:
 	call	Terminal_Init
 	call	Memory_Init
 
-	call	Memory_PrintInfo
+	; Alloc stack
+	push	8192
+	call	Memory_Alloc
+	add	eax, 8192
+	mov	esp, eax
+
+	; Initialize rest of kernel services
+	call	Timer_Init
 
 	; Alloc
 	push	2048
@@ -80,16 +88,33 @@ Init32:
 	call	Memory_PrintInfo
 
 	; Free
-	push	32
+	push	32+8
 	call	Memory_Free
 	add	esp, 4
 	call	Memory_PrintInfo
 
 	; Free
-	push	32+2048+8
+	push	32+8+2048+8
 	call	Memory_Free
 	add	esp, 4
 	call	Memory_PrintInfo
+
+	sti
+.xxx:
+	push	dword [tmp_value]
+	push	.tmp
+	call	Terminal_Print
+	add	esp, 8
+
+	xchg bx, bx
+	push	dword 1000
+	call	Timer_Delay
+	add	esp, 4
+
+	inc	dword [tmp_value]
+
+	hlt
+	jmp	.xxx
 
 	; End of kernel, halt :(
 	push	.end_of_kernel
@@ -97,6 +122,8 @@ Init32:
 	hlt
 	jmp	$-1
 .end_of_kernel db 0xA,"Kernel halted... :(",0
+.tmp db "Value: %p",0xD,0
+tmp_value dd 0
 
 Panic:
 	pushf
@@ -164,5 +191,6 @@ stackBegin:
 %include "IDT.asm"
 %include "Terminal.asm"
 %include "Memory.asm"
+%include "Timer.asm"
 
 KERNEL_END equ $-$$ + 0x500

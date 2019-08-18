@@ -164,7 +164,7 @@ Terminal_CR:
 	ret
 
 Terminal_Scroll:
-	xchg	bx, bx
+	;xchg	bx, bx
 
 	; Scroll
 	mov	esi, 0xa0000 + 320 * (fontHeight + fontHeight / 2)
@@ -233,6 +233,8 @@ Terminal_Print:
 	je	.special_d
 	cmp	al, 'u'
 	je	.special_u
+	cmp	al, 'b'
+	je	.special_b
 
 	push	word '%'
 	call	Terminal_Put
@@ -338,6 +340,49 @@ Terminal_Print:
 
 	pop	edx
 	pop	eax
+	jmp	.loop
+
+.special_b:
+	mov	eax, [ebp + edi]
+
+	mov	ecx, 1
+	test	eax, eax
+	jz	.special_b_zero
+
+	mov	ecx, 32
+.special_b_dec_ecx:
+	test	eax, 1 << 31
+	jnz	.special_b_loop
+	dec	ecx
+	shl	eax, 1
+	jmp	.special_b_dec_ecx
+
+.special_b_loop:
+	test	eax, 1 << 31
+	jz	.special_b_zero
+	jnz	.special_b_one
+
+.special_b_zero:
+	push	dword '0'
+	call	Terminal_Put
+	add	esp, 4
+	jmp	.special_b_next_bit
+
+.special_b_one:
+	push	dword '1'
+	call	Terminal_Put
+	add	esp, 4
+	jmp	.special_b_next_bit
+
+.special_b_next_bit:
+	shl	eax, 1
+	loop	.special_b_loop
+
+	push	dword 'b'
+	call	Terminal_Put
+	add	esp, 4
+
+	add	edi, 4
 	jmp	.loop
 
 .exit:

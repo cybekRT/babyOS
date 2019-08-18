@@ -56,11 +56,11 @@ Memory_PreInit:
 
 .legacy:
 	; TODO: detect memory size, reserve standard BIOS and GPU ranges
-;	mov	dword [MEM_MAP_entries], 1
-;	mov	eax, MEM_MAP
-;	mov	dword [eax + MEMMap_t.base], 0x0
-;	mov	dword [eax + MEMMap_t.length], 0xfffff
-;	mov	byte [eax + MEMMap_t.type], 0x1
+	mov	dword [MEM_MAP_entries], 1
+	mov	eax, MEM_MAP
+	mov	dword [eax + MEMMap_t.base], 0x0
+	mov	dword [eax + MEMMap_t.length], 0xfffff
+	mov	byte [eax + MEMMap_t.type], 0x1
 	jmp	.exit
 [bits 32]
 
@@ -82,7 +82,7 @@ Memory_Init:
 	cmp	dword [MEM_MAP_entries], 0
 	jz	.error
 
-	call	Memory_Sort
+	call	Memory_InitSort
 
 	mov	eax, [MEM_MAP + MEMMap_t.base]
 	test	eax, eax
@@ -134,38 +134,82 @@ Memory_Init:
 .okMsg db "OK!",0xA,0
 .helloMsg db "Initializing memory manager... ",0,0xA,0
 
-Memory_PrintInfo:
-	rpush	eax, ecx
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Memory sort - sort memory map entries and disable non-free ones
+; TODO: if exist overlapping entries, divide them...
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Memory_InitSort:
 	;xchg	bx, bx
+	rpush	eax, ecx, esi, edi
+.start:
 	mov	ecx, 0
-	mov	eax, [MEM_Handle]
+	mov	ebx, 0
 .loop:
-	push	dword [eax + MEM_Handle_t.next]
-	push	dword [eax + MEM_Handle_t.length]
-	push	eax
-	push	.dbg
-	;call	Terminal_Print
-	add	esp, 16
+	inc	ecx
+	cmp	ecx, [MEM_MAP_entries]
+	jae	.exit
+	dec	ecx
 
-	add	ecx, [eax + MEM_Handle_t.length]
-	mov	eax, [eax + MEM_Handle_t.next]
-	
-	test	eax, eax
-	jnz	.loop
+	mov	eax, MEM_MAP
+	mov	esi, ecx
+	shl	esi, 5
+	mov	edi, esi
+	add	edi, MEMMap_t_size
+
+	; TODO: qemu's entries don't overlap... if you find overlapping, implement sorting and diving them... :|
+	;mov	eax, [MEM_MAP + esi + MEMMap_t.base]
+	;cmp	eax, [MEM_MAP + edi + MEMMap_t.base]
+	mov	al, [MEM_MAP + esi + MEMMap_t.type]
+	cmp	al, [MEM_MAP + edi + MEMMap_t.type]
+	jbe	.nosort
+
+	mov	ebx, 1
+	push	ecx
+	push	esi
+	push	edi
+
+	mov	ecx, MEMMap_t_size
+.sort_loop:
+	mov	al, [MEM_MAP + esi + MEMMap_t.base]
+	mov	ah, [MEM_MAP + edi + MEMMap_t.base]
+	mov	[MEM_MAP + esi + MEMMap_t.base], ah
+	mov	[MEM_MAP + edi + MEMMap_t.base], al
+	inc	esi
+	inc	edi
+	dec	ecx
+	jnz	.sort_loop
+	pop	edi
+	pop	esi
+	pop	ecx
+.nosort:
+	inc	ecx
+	jmp	.loop
 
 .exit:
-	push	dword [MEM_Total]
-	push	ecx
-	push	.msg
-	call	Terminal_Print
-	add	esp, 12
+	test	ebx, ebx
+	jnz	.start
 
+	; TODO: no overlapping, just disable reserved entries
+	mov	ecx, 0
+	mov	eax, [MEM_MAP_entries]
+.disable_loop:
+	cmp	ecx, eax
+	je	.disable_exit
+
+	mov	esi, ecx
+	shl	esi, 5
+	cmp	byte [MEM_MAP + esi + MEMMap_t.type], 1
+	je	.disable_loop_ok
+	dec	dword [MEM_MAP_entries]
+.disable_loop_ok:
+	inc	ecx
+	jmp	.disable_loop
+
+.disable_exit:
 	rpop
 	ret
-
-.msg db "Memory %u/%u",0xA,0
-.dbg db "  %p (%u) -> %p",0xA,0
 
 Memory_InitInternal:
 	rpush	eax, esi, edi
@@ -270,8 +314,16 @@ Memory_Alloc:
 
 .ok:
 	pop	eax
+
 	add	eax, MEM_Handle_t_size
 .exit:
+	sub	edx, MEM_Handle_t_size
+	push	edx
+	push	eax
+	push	.allocStr
+	call	Terminal_Print
+	add	esp, 12
+
 	rpop
 	ret
 .error:
@@ -282,84 +334,137 @@ Memory_Alloc:
 	mov	eax, 0
 	jmp	.exit
 .errorMsg db "Not enough memory...",0xA,0
+.allocStr db "Allocated %p - %u bytes",0xA,0
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Memory free
+; Arguments:
+; 	(ebp + 8)	-	size
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Memory_Free:
+	rpush	ebp, eax, ebx, esi, edi
 
+	; Get pointer and move it to header instead of payload
+	mov	eax, [ebp + 8]
+	sub	eax, MEM_Handle_t_size
+
+	push	dword [eax + MEM_Handle_t.length]
+	push	dword [ebp + 8]
+	push	.freeStr
+	call	Terminal_Print
+	add	esp, 12
+
+	mov	esi, 0
+	mov	edi, [MEM_Handle]
+
+.search_loop:
+	cmp	eax, edi
+	jb	.found
+	mov	esi, edi
+	mov	edi, [edi + MEM_Handle_t.next]
+	test	edi, edi
+	jz	.last_entry
+	jmp	.search_loop
+
+.found:
+	test	esi, esi
+	jz	.first_entry
+
+	mov	ebx, [esi + MEM_Handle_t.next]
+	mov	[eax + MEM_Handle_t.next], ebx
+	mov	[esi + MEM_Handle_t.next], eax
+
+	jmp	.exit
+.first_entry:
+	mov	ebx, [MEM_Handle]
+	mov	[eax + MEM_Handle_t.next], ebx
+	mov	[MEM_Handle], eax
+	jmp	.exit
+
+.last_entry:
+	mov	[esi + MEM_Handle_t.next], eax
+	mov	[eax + MEM_Handle_t.next], dword 0
+	
+.exit:
+	call	Memory_Merge
+
+	rpop
 	ret
+.freeStr db "Freeing   %p - %u bytes",0xA,0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Memory sort - sort memory map entries and disable non-free ones
-; TODO: if exist overlapping entries, divide them...
+; Memory Merge - merge entries in linked list
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Memory_Sort:
+Memory_Merge:
+	rpush	eax, esi, edi
 	;xchg	bx, bx
-	rpush	eax, ecx, esi, edi
-.start:
-	mov	ecx, 0
-	mov	ebx, 0
+
+	mov	esi, [MEM_Handle]
 .loop:
-	inc	ecx
-	cmp	ecx, [MEM_MAP_entries]
-	jae	.exit
-	dec	ecx
+	test	esi, esi
+	jz	.exit
 
-	mov	eax, MEM_MAP
-	mov	esi, ecx
-	shl	esi, 5
-	mov	edi, esi
-	add	edi, MEMMap_t_size
+	mov	eax, esi
+	add	eax, [esi + MEM_Handle_t.length]
+	add	eax, MEM_Handle_t_size
+	mov	edi, [esi + MEM_Handle_t.next]
+	;xchg bx, bx
+	cmp	eax, edi
+	jne	.next
 
-	; TODO: qemu's entries don't overlap... if you find overlapping, implement sorting and diving them... :|
-	;mov	eax, [MEM_MAP + esi + MEMMap_t.base]
-	;cmp	eax, [MEM_MAP + edi + MEMMap_t.base]
-	mov	al, [MEM_MAP + esi + MEMMap_t.type]
-	cmp	al, [MEM_MAP + edi + MEMMap_t.type]
-	jbe	.nosort
+	mov	eax, [edi + MEM_Handle_t.length]
+	add	eax, MEM_Handle_t_size
+	add	[esi + MEM_Handle_t.length], eax
+	mov	edi, [edi + MEM_Handle_t.next]
+	mov	[esi + MEM_Handle_t.next], edi
+	jmp	.loop
 
-	mov	ebx, 1
-	push	ecx
-	push	esi
-	push	edi
-
-	mov	ecx, MEMMap_t_size
-.sort_loop:
-	mov	al, [MEM_MAP + esi + MEMMap_t.base]
-	mov	ah, [MEM_MAP + edi + MEMMap_t.base]
-	mov	[MEM_MAP + esi + MEMMap_t.base], ah
-	mov	[MEM_MAP + edi + MEMMap_t.base], al
-	inc	esi
-	inc	edi
-	dec	ecx
-	jnz	.sort_loop
-	pop	edi
-	pop	esi
-	pop	ecx
-.nosort:
-	inc	ecx
+.next:
+	mov	esi, [esi + MEM_Handle_t.next]
 	jmp	.loop
 
 .exit:
-	test	ebx, ebx
-	jnz	.start
-
-	; TODO: no overlapping, just disable reserved entries
-	mov	ecx, 0
-	mov	eax, [MEM_MAP_entries]
-.disable_loop:
-	cmp	ecx, eax
-	je	.disable_exit
-
-	mov	esi, ecx
-	shl	esi, 5
-	cmp	byte [MEM_MAP + esi + MEMMap_t.type], 1
-	je	.disable_loop_ok
-	dec	dword [MEM_MAP_entries]
-.disable_loop_ok:
-	inc	ecx
-	jmp	.disable_loop
-
-.disable_exit:
 	rpop
 	ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Memory Print Info
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Memory_PrintInfo:
+	rpush	eax, ecx
+
+	;xchg	bx, bx
+	mov	ecx, 0
+	mov	eax, [MEM_Handle]
+.loop:
+	push	dword [eax + MEM_Handle_t.next]
+	push	dword [eax + MEM_Handle_t.length]
+	push	eax
+	push	.dbg
+	call	Terminal_Print
+	add	esp, 16
+
+	add	ecx, [eax + MEM_Handle_t.length]
+	mov	eax, [eax + MEM_Handle_t.next]
+	
+	test	eax, eax
+	jnz	.loop
+
+.exit:
+	push	dword [MEM_Total]
+	push	ecx
+	push	.msg
+	call	Terminal_Print
+	add	esp, 12
+
+	rpop
+	ret
+
+.msg db "Memory %u/%u",0xA,0
+.dbg db "  %p (%u) -> %p",0xA,0
