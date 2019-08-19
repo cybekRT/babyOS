@@ -335,6 +335,9 @@ Memory_Alloc:
 	call	Terminal_Print
 	add	esp, 4
 
+	;call	Panic
+	jmp $
+
 	mov	eax, 0
 	jmp	.exit
 .errorMsg db "Not enough memory...",0xA,0

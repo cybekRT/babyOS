@@ -4,7 +4,7 @@
 
 KERNEL_BEGIN:
 	mov	[driveNumber], dl
-	call	Init
+	jmp	Init16
 
 %include "../global.inc"
 %include "Interrupt.inc"
@@ -19,7 +19,7 @@ driveNumber db 0
 ; Real Mode - entry
 ;
 ;;;;;;;;;;
-Init:
+Init16:
 	cli
 
 	mov	bx, 0
@@ -50,8 +50,6 @@ Init:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 [bits 32]
 Init32:
-	;xchg bx, bx
-
 	mov	bx, 0x10
 	mov	ds, bx
 	mov	es, bx
@@ -77,8 +75,8 @@ Init32:
 	;xchg bx, bx
 
 	; Initialize rest of kernel services
-	call	Timer_Init
 	call	Process_Init
+	call	Timer_Init
 
 	;cli
 	;hlt
