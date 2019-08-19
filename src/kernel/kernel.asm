@@ -127,7 +127,7 @@ Init32:
 	push	dword [tmp_value1]
 	push	dword [tmp_value]
 	push	.tmp
-	;call	Terminal_Print
+	call	Terminal_Print
 	add	esp, 16
 
 	;xchg bx, bx
@@ -153,7 +153,7 @@ tmp_value1 dd 0
 tmp_value2 dd 0
 
 PidA:
-	sti
+	;sti
 	push	1000
 	call	Timer_Delay
 	add	esp, 4
@@ -162,7 +162,7 @@ PidA:
 	jmp	PidA
 
 PidB:
-	sti
+	;sti
 	push	3000
 	call	Timer_Delay
 	add	esp, 4

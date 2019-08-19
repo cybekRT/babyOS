@@ -63,9 +63,9 @@ Process_Init:
 	ret
 
 Process_Scheduler:
-	;cli
+	cli
 
-	;xchg bx, bx
+	xchg bx, bx
 	add	esp, 4
 	;iret
 
@@ -80,11 +80,12 @@ Process_Scheduler:
 	mov	[eax + Process_t.esi], esi
 	mov	[eax + Process_t.edi], edi
 	mov	[eax + Process_t.ebp], ebp
-	mov	[eax + Process_t.esp], esp
 
 	pop	dword [eax + Process_t.eip]
 	pop	dword [eax + Process_t.cs]
 	pop	dword [eax + Process_t.eflags]
+
+	mov	[eax + Process_t.esp], esp
 
 	mov	eax, [eax + ProcessEntry_t.next]
 	test	eax, eax
@@ -110,7 +111,7 @@ Process_Scheduler:
 	;push	eax
 	;mov	eax, []
 
-	;sti
+	sti
 	;mov	al, 0x20
 	;out	0x20, al
 	iret
