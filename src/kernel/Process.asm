@@ -67,7 +67,7 @@ Process_Init:
 Process_Scheduler:
 	cli
 
-	xchg bx, bx
+	;xchg bx, bx
 	add	esp, 4
 	;iret
 
@@ -127,6 +127,8 @@ Process_Scheduler:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Process_Spawn:
 	rpush	ebp, eax, edi
+	pushf
+	cli
 
 	;push	.preMsg
 	;call	Terminal_Print
@@ -177,6 +179,7 @@ Process_Spawn:
 	add	esp, 12
 
 .exit:
+	popf
 	rpop
 	ret
 .preMsg db "Spawning process...",0xA,0

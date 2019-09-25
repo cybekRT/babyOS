@@ -77,6 +77,9 @@ Init32:
 	; Initialize rest of kernel services
 	call	Process_Init
 	call	Timer_Init
+	
+	call	Floppy_Init
+	call	Floppy_Read
 
 	;cli
 	;hlt
@@ -118,7 +121,7 @@ Init32:
 	call	Process_Spawn
 	add	esp, 4
 
-	xchg bx, bx
+	;xchg bx, bx
 	sti
 .xxx:
 	push	dword [tmp_value2]
@@ -239,6 +242,7 @@ times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 %include "Memory.asm"
 %include "Timer.asm"
 %include "Process.asm"
+%include "Floppy.asm"
 
 align 32
 KERNEL_END equ $-$$ + 0x500

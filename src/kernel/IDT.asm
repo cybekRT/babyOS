@@ -130,12 +130,13 @@ ISR_GeneralProtectionFault:
 	xchg	bx, bx
 	;jmp	Panic
 
-	push	.msg
-	call	Terminal_Print
-	add	esp, 4
+	;push	.msg
+	;call	Terminal_Print
+	;add	esp, 4
 
 	; Selector index
 	mov	eax, [ebp + 4]
+	jmp $
 	shr	eax, 3
 	push	eax
 
@@ -153,6 +154,8 @@ ISR_GeneralProtectionFault:
 	push	.msgCode
 	call	Terminal_Print
 	add	esp, 16
+
+	jmp $
 
 	mov	al, 12
 	; top

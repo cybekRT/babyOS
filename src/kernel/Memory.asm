@@ -82,6 +82,7 @@ Memory_Init:
 	cmp	dword [MEM_MAP_entries], 0
 	jz	.error
 
+	call	Memory_InitA20
 	call	Memory_InitSort
 
 	mov	eax, [MEM_MAP + MEMMap_t.base]
@@ -113,6 +114,16 @@ Memory_Init:
 	; Fill internal linked-list
 	call	Memory_InitInternal
 
+	; Check if a20 is working
+	mov	eax, 0x100000
+	mov	ebx, 0x000000
+	mov	[eax], byte 0x00
+	mov	[ebx], byte 0xff
+	mov	al, [eax]
+	mov	ah, [ebx]
+	cmp	al, ah
+	;je	.no_a20
+
 	;mov	ax, 0xE881
 	;int	0x15
 	;jc	.error
@@ -130,12 +141,28 @@ Memory_Init:
 	call	Terminal_Print
 	add	esp, 4
 	jmp	Panic
+.no_a20:
+	push	.errorA20
+	call	Terminal_Print
+	add	esp, 4
+	jmp	Panic
 
 .entriesCount db "Entries: %u",0xA,0
 .entry db "Base: %x", 0xA, "  Length: %p, Type: %x",0xA,0
 .errorMsg db "Failed!",0xA,0
+.errorA20 db "A20 is disabled!",0xA,0
 .okMsg db "OK!",0xA,0
 .helloMsg db "Initializing memory manager... ",0,0xA,0
+
+Memory_InitA20:
+	; Fast A20
+	in	al, 0x92
+	or	al, 2
+	out	0x92, al
+
+	; TODO - pcem needs enabling by keyboard controller
+
+	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
