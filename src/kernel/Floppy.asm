@@ -266,8 +266,10 @@ Floppy_Init:
 Floppy_IRQ:
 	mov	[fdd_irq], byte 1
 
+	push	ax
 	mov	al, 0x20
 	out	0x20, al
+	pop	ax
 
 	iret
 
