@@ -63,13 +63,14 @@ FDD_CMD_OPTION_MFM			equ 0x40
 FDD_CMD_OPTION_SKIP			equ 0x20
 
 %macro fdd_wait_irq 0
+mov	[fdd_irq], byte 0
 pushf
 sti
 %%wait:
 	hlt
-	cmp	[fdd_irq], byte 0
+	cmp	[fdd_irq], byte 1
 	jz	%%wait
-	mov	[fdd_irq], byte 0
+	;mov	[fdd_irq], byte 0
 popf
 %endmacro
 
@@ -79,11 +80,14 @@ popf
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
-	test	al, FDD_MSR_RQM
-	jz	%%loop
-	test	al, FDD_MSR_DIO
+	;test	al, FDD_MSR_RQM
+	;jz	%%loop
+	;test	al, FDD_MSR_DIO
+	;jnz	%%loop
+	and	al, 11000000b
+	cmp	al, 10000000b
 	jnz	%%loop
-	jmp	%%ok
+	;jmp	%%ok
 %%ok:
 	pop	edx
 	pop	eax
@@ -95,12 +99,15 @@ popf
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
-	test	al, FDD_MSR_RQM
-	jz	%%loop
-	test	al, FDD_MSR_DIO
-	jz	%%loop
-	;test	al, FDD_MSR_CB
-	;jnz	%%loop
+	;test	al, FDD_MSR_RQM
+	;jz	%%loop
+	;test	al, FDD_MSR_DIO
+	;jz	%%loop
+	;;test	al, FDD_MSR_CB
+	;;jnz	%%loop
+	and	al, 11000000b
+	cmp	al, 11000000b
+	jne	%%loop
 	jmp	%%ok
 %%ok:
 	pop	edx
@@ -108,14 +115,16 @@ popf
 %endmacro
 
 %macro fdd_exec 1-*
-	fdd_wait_ready_out
+	push	eax
+	push	edx
+	;fdd_wait_ready_out
 
-	mov	ebx, 0
-	mov	edx, 0
+	;mov	ebx, 0
+	;mov	edx, 0
 
-	mov	dx, FDD_REG_DATA_FIFO
-	mov	al, %1
-	out	dx, al
+	;mov	dx, FDD_REG_DATA_FIFO
+	;mov	al, %1
+	;out	dx, al
 
 	; push	eax
 	; push	edx
@@ -123,11 +132,12 @@ popf
 	; call	Terminal_Print
 	; add	esp, 12
 
-	%rep %0-1
-		%rotate 1
+	%rep %0
 		fdd_wait_ready_out
+		mov	dx, FDD_REG_DATA_FIFO
 		mov	al, %1
 		out	dx, al
+		%rotate 1
 
 		; push	eax
 		; push	edx
@@ -135,6 +145,9 @@ popf
 		; call	Terminal_Print
 		; add	esp, 12
 	%endrep
+
+	pop	edx
+	pop	eax
 %endmacro
 
 %macro fdd_read 1
@@ -148,6 +161,16 @@ popf
 	pop	edx
 	;pop	eax
 %endmacro
+
+Floppy_IRQ:
+	or	[fdd_irq], byte 1
+
+	push	ax
+	mov	al, 0x20
+	out	0x20, al
+	pop	ax
+
+	iret
 
 outo db "Port: %x, Out: %x",0xA,0
 
@@ -167,12 +190,16 @@ Floppy_Init:
 	add	esp, 8
 	sti
 
+	call	Floppy_Reset
+	call	Floppy_Recalibrate
+	ret
+
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0x00
+	mov	al, FDD_DOR_RESET
 	out	dx, al
 
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0x0C
+	mov	al, 0x00
 	out	dx, al
 
 ;.reset_loop:
@@ -263,15 +290,64 @@ Floppy_Init:
 .version db "FDD Version: %x",0xA,0
 .lock db "FDD Lock: %x",0xA,0
 
-Floppy_IRQ:
-	mov	[fdd_irq], byte 1
+Floppy_Reset:
+	; reset
+	mov	dx, FDD_REG_DIGITAL_OUT
+	mov	al, !FDD_DOR_RESET; | FDD_DOR_IRQ
+	out	dx, al
 
-	push	ax
-	mov	al, 0x20
-	out	0x20, al
-	pop	ax
+	; wait 10ms
+	push	dword 10
+	call	Timer_Delay
+	add	esp, 4
 
-	iret
+	; datarate
+	mov	dx, FDD_REG_DATARATE_SELECT
+	mov	al, FDD_DSR_TYPE_144
+	out	dx, al
+
+	; un-reset
+	mov	dx, FDD_REG_DIGITAL_OUT
+	mov	al, FDD_DOR_RESET; | FDD_DOR_IRQ
+	out	dx, al
+
+
+	mov	ecx, 4
+.senseIrq:
+	fdd_exec FDD_CMD_SENSE_INTERRUPT
+	fdd_read al
+	fdd_read al
+	loop	.senseIrq
+
+	; Specify
+	fdd_exec FDD_CMD_SPECIFY, 0xDF, 0x02
+	ret
+
+Floppy_Recalibrate:
+	mov	dx, FDD_REG_DIGITAL_OUT
+	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA
+	out	dx, al
+
+	; wait for motor to start
+	push	dword 100
+	call	Timer_Delay
+	add	esp, 4
+
+	mov	eax, 0
+	fdd_exec FDD_CMD_RECALIBRATE, 0x00
+
+	fdd_exec 0x08
+	fdd_read al
+	xchg	al, ah
+	fdd_read al
+
+	push	eax
+	push	.status
+	call	Terminal_Print
+	add	esp, 8
+
+	ret
+.status db "FDD Status: %x",0xA,0
 
 Floppy_Read:
 	fdd_wait_ready_out
@@ -280,17 +356,18 @@ Floppy_Read:
 	call	Terminal_Print
 	add	esp, 4
 
-	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, (0 << 2) | 0, 0, 0, 1, 2, 2, 0x1b, 0xff
+	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, (0 << 2) | 0, 0, 0, 1, 2, 1, 0x1b, 0xff
 
-	mov	eax, buffer
+	mov	edi, buffer
+	mov	ecx, 512 + 7
 .loop:
 	fdd_wait_ready_in
 
 	mov	dx, FDD_REG_DATA_FIFO
 	in	al, dx
 
-	mov	[eax], al
-	inc	eax
+	mov	[edi], al
+	inc	edi
 
 	movzx	ebx, al
 	push	ebx
@@ -299,8 +376,13 @@ Floppy_Read:
 	add	esp, 8
 
 	;hlt
-	jmp	.loop
+	;jmp	.loop
+	loop	.loop
+
+	push	dword 1000
+	call	Timer_Delay
+	add	esp, 4
 
 	ret
 .msg db "Reading: ",0
-.msg2 db "%x ",0
+.msg2 db "%X ",0

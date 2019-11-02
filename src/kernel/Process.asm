@@ -61,7 +61,7 @@ Process_Init:
 	push	dword [ebp]
 
 	mov	[current_process], ebx
-	
+
 	ret
 
 Process_Scheduler:

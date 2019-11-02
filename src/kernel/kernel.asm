@@ -80,6 +80,10 @@ Init32:
 	
 	call	Floppy_Init
 	call	Floppy_Read
+	call	Floppy_Read
+	call	Floppy_Read
+
+	;jmp $
 
 	;cli
 	;hlt

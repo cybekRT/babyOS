@@ -136,7 +136,7 @@ ISR_GeneralProtectionFault:
 
 	; Selector index
 	mov	eax, [ebp + 4]
-	jmp $
+	;jmp $
 	shr	eax, 3
 	push	eax
 
@@ -155,7 +155,7 @@ ISR_GeneralProtectionFault:
 	call	Terminal_Print
 	add	esp, 16
 
-	jmp $
+	;jmp $
 
 	mov	al, 12
 	; top
