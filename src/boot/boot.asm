@@ -49,7 +49,7 @@ rootOffset dw 0
 kernelCluster dw 0
 kernelPosition dw KERNEL_LOC
 fatSector dw 0xFFFF
-helloMsg db "Loading kernel..."
+helloMsg db OS_NAME, 0xA, 0xD, "Loading kernel..."
 helloMsgLen equ ($ - helloMsg)
 db helloMsgLen
 ;;;;;

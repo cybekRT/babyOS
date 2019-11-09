@@ -49,6 +49,7 @@ Init16:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 [bits 32]
+tmpBuffer times 1024 db 0
 Init32:
 	mov	bx, 0x10
 	mov	ds, bx
@@ -79,9 +80,13 @@ Init32:
 	call	Timer_Init
 	
 	call	Floppy_Init
+
+	push	tmpBuffer
+	push	dword 0
 	call	Floppy_Read
-	call	Floppy_Read
-	call	Floppy_Read
+	add	esp, 8
+	;call	Floppy_Read
+	;call	Floppy_Read
 
 	;jmp $
 

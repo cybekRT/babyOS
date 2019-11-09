@@ -133,6 +133,10 @@ popf
 	; add	esp, 12
 
 	%rep %0
+		%if %1 = al || %1 = dl || %1 = dh
+			%error Invalid register!
+		%endif
+
 		fdd_wait_ready_out
 		mov	dx, FDD_REG_DATA_FIFO
 		mov	al, %1
@@ -194,98 +198,6 @@ Floppy_Init:
 	call	Floppy_Recalibrate
 	ret
 
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_RESET
-	out	dx, al
-
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0x00
-	out	dx, al
-
-;.reset_loop:
-;	hlt
-;	cmp	[fdd_irq], byte 0
-;	jz	.reset_loop
-;	mov	[fdd_irq], byte 0
-	;fdd_wait_irq
-	fdd_wait_ready_out
-
-	; select data rate
-	mov	dx, FDD_REG_DATARATE_SELECT
-	mov	al, FDD_DSR_TYPE_144
-	out	dx, al
-
-	; select
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_DSELA | FDD_DOR_MOTA
-	
-	;push	30000
-	;call	Timer_Delay
-	;add	esp, 4
-
-	mov	eax, 0
-	mov	dx, FDD_REG_MAIN_STATUS
-	in	al, dx
-
-	push	eax
-	push	.status
-	call	Terminal_Print
-	add	esp, 8
-
-	; version
-	;mov	dx, FDD_REG_DATA_FIFO
-	;mov	al, FDD_CMD_VERSION
-	;out	dx, al
-
-	mov	eax, 0
-	;in	al, dx
-	fdd_exec FDD_CMD_VERSION
-	fdd_read al
-
-	push	eax
-	push	.version
-	call	Terminal_Print
-	add	esp, 8
-
-	; configure
-	fdd_exec FDD_CMD_CONFIGURE, 0, (1 << 6) | (0 << 5) | (0 << 4) | (8), 0
-	; lock
-	fdd_exec FDD_CMD_OPTION_MULTITRACK | FDD_CMD_LOCK
-	mov	eax, 0
-	fdd_read al
-	push	eax
-	push	.lock
-	call	Terminal_Print
-	add	esp, 8
-	; reset
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0x00
-	out	dx, al
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0x0C
-	out	dx, al
-	;fdd_wait_irq
-	; recalibrate
-	fdd_exec FDD_CMD_RECALIBRATE, 0
-	;fdd_read al
-
-	;fdd_wait_irq
-
-
-
-
-	; select data rate
-	mov	dx, FDD_REG_DATARATE_SELECT
-	mov	al, FDD_DSR_TYPE_144
-	out	dx, al
-
-	; select
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_DSELA | FDD_DOR_MOTA
-
-
-	ret
-
 .status db "FDD Status: %b",0xA,0
 .version db "FDD Version: %x",0xA,0
 .lock db "FDD Lock: %x",0xA,0
@@ -336,7 +248,7 @@ Floppy_Recalibrate:
 	mov	eax, 0
 	fdd_exec FDD_CMD_RECALIBRATE, 0x00
 
-	fdd_exec 0x08
+	fdd_exec FDD_CMD_SENSE_INTERRUPT
 	fdd_read al
 	xchg	al, ah
 	fdd_read al
@@ -349,17 +261,81 @@ Floppy_Recalibrate:
 	ret
 .status db "FDD Status: %x",0xA,0
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Floppy - Seek track
+; Parameters:
+;	(ebp + 8) - track
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Floppy_Seek:
+	rpush	ebp, eax
+
+	push	dword [ebp + 8]
+	push	.msg
+	call	Terminal_Print
+	add	esp, 8
+
+	fdd_wait_ready_out
+
+	mov	ah, [ebp + 8]
+	fdd_exec FDD_CMD_SEEK, 0, ah
+
+	fdd_exec FDD_CMD_SENSE_INTERRUPT
+	fdd_read al
+	fdd_read al
+
+	rpop
+	ret
+.msg db "Seeking track: %d",0xA,0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Floppy - Read
+; Parameters:
+;	(ebp +  8) - lba
+;	(ebp + 12) - buffer
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Read:
+	rpush	ebp, eax, ecx, edx, edi
+
+	; LBA 2 CHS
+	mov	eax, [ebp + 8]
+	mov	bl, 18 ; [sectorsPerTrack]
+	div	bl
+
+	mov	cl, ah ; Sectors
+	inc	cl
+	xor	ah, ah
+
+	mov	bl, 2 ; [headsCount]
+	div	bl
+
+	mov	ch, ah ; Heads
+	;mov	ch, al ; Cylinders
+
+	movzx	eax, al
+	push	eax
+	call	Floppy_Seek
+	add	esp, 4
+
+	; Start reading
 	fdd_wait_ready_out
 
 	push	.msg
 	call	Terminal_Print
 	add	esp, 4
 
-	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, (0 << 2) | 0, 0, 0, 1, 2, 1, 0x1b, 0xff
+	; head -> ch
+	; sector -> cl
+	shl	ch, 2
+	or	ch, 0 ; drive number
+	mov	ah, al
+	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, ch, cl, 2, 18, 0x1b, 0xff
 
-	mov	edi, buffer
-	mov	ecx, 512 + 7
+	mov	edi, [ebp + 12]
+	mov	ecx, 512
 .loop:
 	fdd_wait_ready_in
 
@@ -375,14 +351,34 @@ Floppy_Read:
 	call	Terminal_Print
 	add	esp, 8
 
-	;hlt
-	;jmp	.loop
 	loop	.loop
 
-	push	dword 1000
+	mov	edi, .statusBuffer
+	mov	ecx, 7
+.loop_status:
+	fdd_wait_ready_in
+
+	mov	dx, FDD_REG_DATA_FIFO
+	in	al, dx
+
+	mov	[edi], al
+	inc	edi
+
+	loop	.loop_status
+
+	push	dword [.statusBuffer]
+	push	dword [.statusBuffer+4]
+	push	.statusMsg
+	call	Terminal_Print
+	add	esp, 12
+
+	push	dword 2000
 	call	Timer_Delay
 	add	esp, 4
 
+	rpop
 	ret
 .msg db "Reading: ",0
-.msg2 db "%X ",0
+.msg2 db "%X",0
+.statusBuffer times 8 db 0
+.statusMsg db 0xA,"Status: %P %P",0xA,0
