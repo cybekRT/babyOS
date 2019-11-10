@@ -62,6 +62,8 @@ FDD_CMD_OPTION_MULTITRACK		equ 0x80
 FDD_CMD_OPTION_MFM			equ 0x40
 FDD_CMD_OPTION_SKIP			equ 0x20
 
+timeoutMsg db "Floppy timeout...",0xA,0
+
 %macro fdd_wait_irq 0
 mov	[fdd_irq], byte 0
 pushf
@@ -76,7 +78,9 @@ popf
 
 %macro fdd_wait_ready_out 0
 	push	eax
+	push	ecx
 	push	edx
+	mov	ecx, 100
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
@@ -86,16 +90,26 @@ popf
 	;jnz	%%loop
 	and	al, 11000000b
 	cmp	al, 10000000b
-	jnz	%%loop
+	;jnz	%%loop
+	jz	%%ok
+	hlt
+	loop	%%loop
+
+	push	timeoutMsg
+	call	Terminal_Print
+	add	esp, 4
 	;jmp	%%ok
 %%ok:
 	pop	edx
+	pop	ecx
 	pop	eax
 %endmacro
 
 %macro fdd_wait_ready_in 0
 	push	eax
+	push	ecx
 	push	edx
+	mov	ecx, 100
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
@@ -107,12 +121,48 @@ popf
 	;;jnz	%%loop
 	and	al, 11000000b
 	cmp	al, 11000000b
-	jne	%%loop
-	jmp	%%ok
+	;jne	%%loop
+	;jmp	%%ok
+	je	%%ok
+
+	;hlt
+	loop	%%loop
+
+	push	timeoutMsg
+	call	Terminal_Print
+	add	esp, 4
+	jmp	$
 %%ok:
 	pop	edx
+	pop	ecx
 	pop	eax
 %endmacro
+
+%macro fdd_write 1
+	fdd_wait_ready_out
+	mov	dx, FDD_REG_DATA_FIFO
+	%ifnidni %1, al
+		mov	al, %1
+	%endif
+	out	dx, al
+%endmacro
+
+%macro fdd_read 1
+	fdd_wait_ready_in
+	mov	dx, FDD_REG_DATA_FIFO
+	in	al, dx
+	%ifnidni %1, al
+		mov	%1, al
+	%endif
+	;%if %1 = al
+	;	%error wtf
+		;mov	%1, al
+	;%endif
+	;%ifidni %1, al
+	;	%error Invalid register!
+	;%endif
+%endmacro
+
 
 %macro fdd_exec 1-*
 	push	eax
@@ -137,10 +187,11 @@ popf
 			%error Invalid register!
 		%endif
 
-		fdd_wait_ready_out
-		mov	dx, FDD_REG_DATA_FIFO
-		mov	al, %1
-		out	dx, al
+		;fdd_wait_ready_out
+		;mov	dx, FDD_REG_DATA_FIFO
+		;mov	al, %1
+		;out	dx, al
+		fdd_write %1
 		%rotate 1
 
 		; push	eax
@@ -154,17 +205,18 @@ popf
 	pop	eax
 %endmacro
 
-%macro fdd_read 1
-	;push	eax
-	push	edx
-
-	fdd_wait_ready_in
-	mov	dx, FDD_REG_DATA_FIFO
-	in	%1, dx
-
-	pop	edx
-	;pop	eax
-%endmacro
+;%macro fdd_read 1
+;	;push	eax
+;	push	edx
+;
+;	;fdd_wait_ready_in
+;	;mov	dx, FDD_REG_DATA_FIFO
+;	;in	%1, dx
+;	fdd_read %1
+;
+;	pop	edx
+;	;pop	eax
+;%endmacro
 
 Floppy_IRQ:
 	or	[fdd_irq], byte 1
@@ -196,6 +248,7 @@ Floppy_Init:
 
 	call	Floppy_Reset
 	call	Floppy_Recalibrate
+	call	Floppy_Lock
 	ret
 
 .status db "FDD Status: %b",0xA,0
@@ -229,7 +282,9 @@ Floppy_Reset:
 	fdd_exec FDD_CMD_SENSE_INTERRUPT
 	fdd_read al
 	fdd_read al
-	loop	.senseIrq
+	;loop	.senseIrq
+	dec	ecx
+	jnz	.senseIrq
 
 	; Specify
 	fdd_exec FDD_CMD_SPECIFY, 0xDF, 0x02
@@ -260,6 +315,11 @@ Floppy_Recalibrate:
 
 	ret
 .status db "FDD Status: %x",0xA,0
+
+Floppy_Lock:
+	fdd_exec FDD_CMD_OPTION_MULTITRACK | FDD_CMD_LOCK
+	fdd_read al
+	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -298,7 +358,14 @@ Floppy_Seek:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Read:
-	rpush	ebp, eax, ecx, edx, edi
+	rpush	ebp, eax, ebx, ecx, edx, edi
+
+	call	Floppy_Reset
+	mov	dx, FDD_REG_DIGITAL_OUT
+	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA
+	out	dx, al
+
+	;and	[ebp + 8], dword 0b1
 
 	; LBA 2 CHS
 	mov	eax, [ebp + 8]
@@ -317,30 +384,33 @@ Floppy_Read:
 
 	movzx	eax, al
 	push	eax
-	call	Floppy_Seek
+	;call	Floppy_Seek
 	add	esp, 4
 
 	; Start reading
-	fdd_wait_ready_out
+	;fdd_wait_ready_out
 
+	push	dword [ebp + 8]
 	push	.msg
 	call	Terminal_Print
-	add	esp, 4
+	add	esp, 8
 
 	; head -> ch
 	; sector -> cl
 	shl	ch, 2
 	or	ch, 0 ; drive number
 	mov	ah, al
-	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, ch, cl, 2, 18, 0x1b, 0xff
+	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, ch, cl, 2, 1, 0x1b, 0xff
+	;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, 0, 0, 0, 2, 2, 18, 0x1b, 0xff
 
 	mov	edi, [ebp + 12]
 	mov	ecx, 512
 .loop:
-	fdd_wait_ready_in
+	;fdd_wait_ready_in
 
-	mov	dx, FDD_REG_DATA_FIFO
-	in	al, dx
+	;mov	dx, FDD_REG_DATA_FIFO
+	;in	al, dx
+	fdd_read al
 
 	mov	[edi], al
 	inc	edi
@@ -353,32 +423,74 @@ Floppy_Read:
 
 	loop	.loop
 
-	mov	edi, .statusBuffer
-	mov	ecx, 7
-.loop_status:
-	fdd_wait_ready_in
+	;push	dword 100
+	;call	Timer_Delay
+	;add	esp, 4
 
-	mov	dx, FDD_REG_DATA_FIFO
-	in	al, dx
+;	mov	edi, .statusBuffer
+;	mov	ecx, 7
+;.loop_status:
+;	fdd_wait_ready_in
+;
+;	mov	dx, FDD_REG_DATA_FIFO
+;	in	al, dx
+;
+;	mov	[edi], al
+;	inc	edi
+;
+;	loop	.loop_status
 
-	mov	[edi], al
-	inc	edi
+	fdd_read	[.statusST0]
+	fdd_read	[.statusST1]
+	fdd_read	[.statusST2]
+	fdd_read	[.statusC]
+	fdd_read	[.statusH]
+	fdd_read	[.statusR]
+	fdd_read	[.statusN]
 
-	loop	.loop_status
+	;push	dword [.statusBuffer]
+	;push	dword [.statusBuffer+4]
+	;push	.statusMsg
+	;call	Terminal_Print
+	;add	esp, 12
 
-	push	dword [.statusBuffer]
-	push	dword [.statusBuffer+4]
-	push	.statusMsg
+	xor	eax, eax
+	mov	al, [.statusST0]
+	push	eax
+	mov	al, [.statusST1]
+	push	eax
+	mov	al, [.statusST2]
+	push	eax
+
+	push	.statusMsg2
 	call	Terminal_Print
-	add	esp, 12
+	add	esp, 16
 
-	push	dword 2000
+	;test	  [.statusST0], byte 11000000b	      ; test sr0 is 0xC0
+	;jnz	  .error
+
+	push	dword 300
 	call	Timer_Delay
 	add	esp, 4
 
 	rpop
 	ret
-.msg db "Reading: ",0
-.msg2 db "%X",0
+.error:
+	push	.errorMsg
+	call	Terminal_Print
+	jmp	$
+
+.msg db "Reading sector %u: ",0
+.msg2 db "%c",0
 .statusBuffer times 8 db 0
 .statusMsg db 0xA,"Status: %P %P",0xA,0
+.errorMsg db "Floppy failed!",0
+
+.statusST0 db 0
+.statusST1 db 0
+.statusST2 db 0
+.statusC db 0
+.statusH db 0
+.statusR db 0
+.statusN db 0
+.statusMsg2 db 0xA,"Status: %b %b %b",0xA,0
