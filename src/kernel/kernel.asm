@@ -80,6 +80,9 @@ Init32:
 	call	Timer_Init
 	
 	call	Floppy_Init
+	call	FAT12_Init
+
+	call	FAT12_OpenRoot
 
 	push	tmpBuffer
 	push	dword 0
@@ -89,7 +92,7 @@ Init32:
 	;add	esp, 8
 
 	inc	dword [ebp]
-	jmp	.x
+	;jmp	.x
 	;call	Floppy_Read
 	;call	Floppy_Read
 
@@ -257,7 +260,7 @@ times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 %include "Timer.asm"
 %include "Process.asm"
 %include "Floppy.asm"
-;%include "FAT12.asm"
+%include "FAT12.asm"
 
 align 32
 KERNEL_END equ $-$$ + 0x500

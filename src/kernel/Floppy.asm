@@ -418,7 +418,7 @@ Floppy_Read:
 	movzx	ebx, al
 	push	ebx
 	push	.msg2
-	call	Terminal_Print
+	;call	Terminal_Print
 	add	esp, 8
 
 	loop	.loop
@@ -469,9 +469,9 @@ Floppy_Read:
 	;test	  [.statusST0], byte 11000000b	      ; test sr0 is 0xC0
 	;jnz	  .error
 
-	push	dword 300
-	call	Timer_Delay
-	add	esp, 4
+	;push	dword 300
+	;call	Timer_Delay
+	;add	esp, 4
 
 	rpop
 	ret

@@ -1,9 +1,9 @@
 %include "FAT12.inc"
 
-bpbPtr dw 0 
-fatPtr dw 0
-fatDirectoryPtr dw 0
-fatEntry dw 0
+bpbPtr dd 0 
+fatPtr dd 0
+fatDirectoryPtr dd 0
+fatEntry dd 0
 
 ;;;;;;;;;;
 ;
@@ -11,50 +11,66 @@ fatEntry dw 0
 ;
 ;;;;;;;;;;
 FAT12_Init:
-	rpush	ax, bx, cx, dx, es
+	rpush	eax, ebx, ecx, edx
 
 	; Alloc BPB buffer
-	push	512
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-	add	sp, 2
-	mov	[cs:bpbPtr], ax
-	mov	es, ax
+	push	dword 512
+	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	call	Memory_Alloc
+	add	esp, 4
+	mov	[bpbPtr], eax
+	;mov	es, ax
 
 	; Read BPB with BIOS function
-	mov	ah, 02h
-	mov	al, 1
-	mov	ch, 0
-	mov	cl, 1
-	mov	dh, 0
-	mov	dl, 0
-	mov	bx, 0
-	int	13h
-	jc	Panic
+	;mov	ah, 02h
+	;mov	al, 1
+	;mov	ch, 0
+	;mov	cl, 1
+	;mov	dh, 0
+	;mov	dl, 0
+	;mov	bx, 0
+	;int	13h
+	;jc	Panic
 
 	; Update BPB about drive number from bootloader
-	mov	al, [cs:driveNumber]
-	mov	[es:FAT12_BPB.driveNumber], al
+	;mov	al, [cs:driveNumber]
+	;mov	[es:FAT12_BPB.driveNumber], al
 
 	; Alloc FAT buffer
-	push	word 512*9 ; FIXME from BPB?
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-	mov	[cs:fatPtr], ax
-	add	sp, 2
+	push	dword 512*9 ; FIXME from BPB?
+	call	Memory_Alloc
+	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	mov	[fatPtr], eax
+	add	esp, 4
 
 	; Read FAT
-	push	ax
-	push	word [es : FAT12_BPB.sectorsPerFat]
-	mov	ax, [es : FAT12_BPB.reservedSectors]
-	add	ax, [es : FAT12_BPB.hiddenSectors]
-	push	ax
-	call	ReadSector
-	add	sp, 6
+	;push	ax
+	;push	word [es : FAT12_BPB.sectorsPerFat]
+	;mov	ax, [es : FAT12_BPB.reservedSectors]
+	;add	ax, [es : FAT12_BPB.hiddenSectors]
+	;push	ax
+	;call	ReadSector
+	;add	sp, 6
+
+	mov	ecx, 9
+	push	dword [fatPtr]
+	push	dword 1
+	mov	ebp, esp
+.loop:
+	call	Floppy_Read
+
+	inc	dword [ebp + 0]
+	add	dword [ebp + 4], 512
+	loop	.loop
+
+	add	esp, 8
 
 	; Alloc FAT entry buffer
-	push	FAT12_Directory_size
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
-	mov	[cs:fatDirectoryPtr], ax
-	add	sp, 2
+	push	dword FAT12_Directory_size
+	call	Memory_Alloc
+	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	mov	[fatDirectoryPtr], eax
+	add	esp, 4
 
 	rpop
 	ret
@@ -68,14 +84,15 @@ FAT12_Init:
 ;
 ;;;;;;;;;;
 FAT12_OpenRoot:
-	rpush	es
+	rpush	esi
 
-	push	word [fatDirectoryPtr]
-	pop	es
+	;push	word [fatDirectoryPtr]
+	;pop	es
+	mov	esi, [fatDirectoryPtr]
 
-	mov	word [es : FAT12_Directory.firstCluster], 0
-	mov	word [es : FAT12_Directory.currentCluster], 0
-	mov	word [es : FAT12_Directory.currentOffset], 0
+	mov	word [esi + FAT12_Directory.firstCluster], 0
+	mov	word [esi + FAT12_Directory.currentCluster], 0
+	mov	word [esi + FAT12_Directory.currentOffset], 0
 
 	rpop
 	ret
@@ -85,15 +102,16 @@ FAT12_OpenRoot:
 ; Close directory handle
 ;
 ; Arguments:
-;	(bp + 4)	-	directory handle
+;	(ebp + 8)	-	directory handle
 ;
 ;;;;;;;;;;
 FAT12_CloseDirectory:
-	rpush	bp
+	rpush	ebp
 
-	push	word [bp + 4]
-	ApiCall	INT_API_MEMORY, MEMORY_FREE
-	add	sp, 2
+	push	word [ebp + 8]
+	;ApiCall	INT_API_MEMORY, MEMORY_FREE
+	call	Memory_Free
+	add	esp, 4
 
 	rpop
 	ret
@@ -104,6 +122,7 @@ FAT12_CloseDirectory:
 ; (bp+4) - sector
 ;;;;;
 ReadSector:
+	int	0xff
 	rpush	bp, ax, bx, cx, dx, si, es
 
 	mov	es, [cs:bpbPtr]
@@ -139,22 +158,23 @@ ReadSector:
 	push	word [es : FAT12_BPB.driveNumber]
 	push	ax
 	push	.statusMsg
-	call	printf
+	call	Terminal_Print
 	add	sp, 6
 
 	call	Panic
 .statusMsg db "Status: %x (Drive: %x)",0xA,0
 
-; ax - cluster
+; eax - cluster
 ClusterToSector:
-	rpush	bx, es
-	mov	es, [cs:bpbPtr]
+	rpush	ebx, esi
+	;mov	es, [cs:bpbPtr]
+	mov	esi, [bpbPtr]
 
-	mov	bx, [es : FAT12_BPB.sectorsPerFat]
-	shl	bx, 1
-	add	bx, [es : FAT12_BPB.reservedSectors]
-	add	bx, [es : FAT12_BPB.hiddenSectors]
-	add	ax, bx
+	movzx	ebx, word [esi + FAT12_BPB.sectorsPerFat]
+	shl	ebx, 1
+	add	bx, word [esi + FAT12_BPB.reservedSectors]
+	add	ebx, dword [esi + FAT12_BPB.hiddenSectors]
+	add	eax, ebx
 
 	; is root?
 	push	es
@@ -213,11 +233,12 @@ FAT12_ReadWholeFile:
 
 	push	word [cs:fatEntry]
 	pop	es
-	mov	ax, [es : FAT12_DirectoryEntry.size]
+	movzx	eax, word [es : FAT12_DirectoryEntry.size]
 	add	ax, 511
 	and	ax, 0xfe00
 	push	ax
-	ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	call	Memory_Alloc
 	add	sp, 2
 
 	mov	di, ax
