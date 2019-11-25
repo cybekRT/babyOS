@@ -19,6 +19,12 @@ FAT12_Init:
 	call	Memory_Alloc
 	add	esp, 4
 	mov	[bpbPtr], eax
+
+	push	dword [bpbPtr]
+	push	dword 0
+	call	Floppy_Read
+	add	esp, 8
+
 	;mov	es, ax
 
 	; Read BPB with BIOS function
@@ -116,57 +122,10 @@ FAT12_CloseDirectory:
 	rpop
 	ret
 
-;;;;;
-; (bp+8) - dst
-; (bp+6) - sectors count
-; (bp+4) - sector
-;;;;;
-ReadSector:
-	int	0xff
-	rpush	bp, ax, bx, cx, dx, si, es
-
-	mov	es, [cs:bpbPtr]
-
-	; LBA 2 CHS
-	mov	bl, [es : FAT12_BPB.sectorsPerTrack]
-	div	bl
-
-	mov	cl, ah ; Sectors
-	inc	cl
-	xor	ah, ah
-
-	mov	bl, [es : FAT12_BPB.headsCount]
-	div	bl
-
-	mov	dh, ah ; Heads
-	mov	ch, al ; Cylinders
-
-	mov	ah, 02h ; Function
-	mov	al, [bp + 6] ; Count
-	mov	dl, [es : FAT12_BPB.driveNumber] ; Drive number
-
-	mov	bx, [bp + 8]
-	mov	es, bx
-	mov	bx, 0
-
-	int	13h
-	jc	.Panic
-
-	rpop
-	ret
-.Panic:
-	push	word [es : FAT12_BPB.driveNumber]
-	push	ax
-	push	.statusMsg
-	call	Terminal_Print
-	add	sp, 6
-
-	call	Panic
-.statusMsg db "Status: %x (Drive: %x)",0xA,0
-
 ; eax - cluster
 ClusterToSector:
 	rpush	ebx, esi
+
 	;mov	es, [cs:bpbPtr]
 	mov	esi, [bpbPtr]
 
@@ -177,15 +136,16 @@ ClusterToSector:
 	add	eax, ebx
 
 	; is root?
-	push	es
-	push	word [cs:fatDirectoryPtr]
-	pop	es
-	cmp	word [es : FAT12_Directory.firstCluster], 0
-	pop	es
+	;push	es
+	;push	word [cs:fatDirectoryPtr]
+	mov	esi, [fatDirectoryPtr]
+	;pop	es
+	cmp	word [esi + FAT12_Directory.firstCluster], 0
+	;pop	es
 	jz	.exit
 
 	; not root :(
-	mov	bx, [es : FAT12_BPB.rootEntriesCount]
+	mov	bx, [esi + FAT12_BPB.rootEntriesCount]
 	shr	bx, 4
 	sub	bx, 2
 	add	ax, bx
@@ -196,16 +156,17 @@ ClusterToSector:
 
 ; ax - cluster
 NextCluster:
-	rpush	bx, es
+	rpush	ebx, esi
 
 	; bx - fat_offset
-	mov	bx, ax
+	movzx	ebx, ax
 	shr	bx, 1
 	add	bx, ax
 
-	push	word [fatPtr]
-	pop	es
-	mov	bx, [es : bx]
+	;push	word [fatPtr]
+	;pop	es
+	mov	esi, [fatPtr]
+	mov	bx, [esi + ebx]
 	test	ax, 1
 	jnz	.odd
 	jz	.even
@@ -251,7 +212,7 @@ FAT12_ReadWholeFile:
 	push	di
 	push	1
 	push	ax
-	call	ReadSector
+	;call	ReadSector
 	add	sp, 6
 
 	add	di, 512/16
@@ -272,37 +233,44 @@ FAT12_ReadWholeFile:
 ;
 ;;;;;;;;;;
 FAT12_ReadDirectory:
-	rpush	ax, es
+	rpush	eax, esi
 
-	push	word [cs:fatDirectoryPtr]
-	pop	es
+	;push	word [cs:fatDirectoryPtr]
+	;pop	es
+	mov	esi, [fatDirectoryPtr]
 
-	cmp	word [es : FAT12_Directory.currentOffset], 0
+	cmp	word [esi + FAT12_Directory.currentOffset], 0
 	jnz	.dontReadNextSector
 
 	; Reading data sector
-	mov	ax, es
-	add	ax, FAT12_Directory.buffer / 16
+	;mov	ax, es
+	;add	ax, FAT12_Directory.buffer / 16
 	;shr	ax, 4
-	push	ax
-	push	1
-	
-	mov	ax, [es : FAT12_Directory.currentCluster]
-	call	ClusterToSector
-	push	ax
+	;push	ax
+	;push	1
 
-	call	ReadSector
-	add	sp, 6
+	push	esi
+	add	[esp], dword FAT12_Directory.buffer
+	
+	movzx	eax, word [esi + FAT12_Directory.currentCluster]
+	call	ClusterToSector
+	push	eax
+
+	;call	ReadSector
+	call	Floppy_Read
+	add	sp, 8
 
 .dontReadNextSector:
-	mov	ax, [es : FAT12_Directory.currentOffset]
-	add	ax, FAT12_Directory.buffer
-	shr	ax, 4
-	mov	bx, es
-	add	ax, bx
+	movzx	eax, word [esi + FAT12_Directory.currentOffset]
+	add	eax, FAT12_Directory.buffer
+	add	eax, esi
 
-	mov	[cs:fatEntry], ax
-	add	word [es : FAT12_Directory.currentOffset], FAT12_DirectoryEntry_size
+	;shr	ax, 4
+	;mov	bx, es
+	;add	ax, bx
+
+	mov	[fatEntry], eax
+	add	word [esi + FAT12_Directory.currentOffset], FAT12_DirectoryEntry_size
 
 	rpop
 	ret

@@ -237,6 +237,8 @@ Terminal_Print:
 	je	.special_b
 	cmp	al, 'c'
 	je	.special_c
+	cmp	al, 's'
+	je	.special_s
 
 	push	word '%'
 	call	Terminal_Put
@@ -396,6 +398,24 @@ Terminal_Print:
 	add	esp, 4
 	add	edi, 4
 
+	jmp	.loop
+
+.special_s:
+	mov	eax, [ebp + edi]
+	add	edi, 4
+	push	edi
+
+.special_s_loop:
+	movzx	edi, byte [eax]
+	push	edi
+	call	Terminal_Put
+	add	esp, 4
+
+	inc	eax
+	cmp	[eax], byte 0
+	jnz	.special_s_loop
+
+	pop	edi
 	jmp	.loop
 
 .exit:

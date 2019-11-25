@@ -384,23 +384,33 @@ Floppy_Read:
 
 	movzx	eax, al
 	push	eax
-	;call	Floppy_Seek
+	call	Floppy_Seek
 	add	esp, 4
+
+	;cli
+	;hlt
 
 	; Start reading
 	;fdd_wait_ready_out
 
+	push	dword [ebp + 12]
 	push	dword [ebp + 8]
 	push	.msg
 	call	Terminal_Print
-	add	esp, 8
+	add	esp, 12
 
 	; head -> ch
 	; sector -> cl
+	mov	bh, ch
 	shl	ch, 2
 	or	ch, 0 ; drive number
 	mov	ah, al
-	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, ch, cl, 2, 1, 0x1b, 0xff
+
+	mov	[.zazaAH], ah
+	mov	[.zazaCL], cl
+	mov	[.zazaCH], ch
+
+	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, bh, cl, 2, 1, 0x1b, 0xff
 	;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, 0, 0, 0, 2, 2, 18, 0x1b, 0xff
 
 	mov	edi, [ebp + 12]
@@ -462,6 +472,13 @@ Floppy_Read:
 	mov	al, [.statusST2]
 	push	eax
 
+	push	dword [.zazaCH]
+	push	dword [.zazaCL]
+	push	dword [.zazaAH]
+	push	.zaza
+	call	Terminal_Print
+	add	esp, 16
+
 	push	.statusMsg2
 	call	Terminal_Print
 	add	esp, 16
@@ -480,11 +497,15 @@ Floppy_Read:
 	call	Terminal_Print
 	jmp	$
 
-.msg db "Reading sector %u: ",0
+.msg db "Reading sector %u at %p",0xA,0
 .msg2 db "%c",0
 .statusBuffer times 8 db 0
 .statusMsg db 0xA,"Status: %P %P",0xA,0
 .errorMsg db "Floppy failed!",0
+.zaza db "AH: %x, CL: %x, CH: %x",0xA,0
+.zazaAH dd 0
+.zazaCL dd 0
+.zazaCH dd 0
 
 .statusST0 db 0
 .statusST1 db 0

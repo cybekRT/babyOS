@@ -83,6 +83,25 @@ Init32:
 	call	FAT12_Init
 
 	call	FAT12_OpenRoot
+	mov	ecx, 10
+.fatLoop:
+	call	FAT12_ReadDirectory
+
+	mov	edi, [fatEntry]
+	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
+	push	dword [fatEntry]
+	push	dword .zz
+	call	Terminal_Print
+	add	esp, 8
+
+	loop	.fatLoop
+
+	cli
+	hlt
+	jmp	$
+
+.zz db "File: '%s'",0xA,0
+.xx db "YoLo",0
 
 	push	tmpBuffer
 	push	dword 0

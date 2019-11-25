@@ -38,10 +38,10 @@ Timer_Init:
 Timer_Delay:
 	rpush	ebp, eax
 
-	push	dword [ebp + 8]
-	push	.msg1
-	call	Terminal_Print
-	add	esp, 8
+	;push	dword [ebp + 8]
+	;push	.msg1
+	;call	Terminal_Print
+	;add	esp, 8
 
 	mov	eax, dword [_ticks]
 	add	eax, [ebp + 8]
@@ -53,9 +53,9 @@ Timer_Delay:
 	cmp	eax, [_ticks]
 	ja	.loop
 
-	push	.msg2
-	call	Terminal_Print
-	add	esp, 4
+	;push	.msg2
+	;call	Terminal_Print
+	;add	esp, 4
 
 	popf
 	rpop
