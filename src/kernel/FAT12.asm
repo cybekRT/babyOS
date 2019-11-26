@@ -101,7 +101,44 @@ FAT12_CloseDirectory:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ClusterToSector:
-	rpush	ebx, esi
+	rpush	ebx, esi, edi
+	;mov	eax, 0x20
+
+	mov	esi, [bpbPtr]
+
+	;movzx	ebx, word [esi + FAT12_BPB.sectorsPerFat]
+	;movzx	ecx, word [esi + FAT12_BPB.reservedSectors]
+	;mov	edx, dword [esi + FAT12_BPB.hiddenSectors]
+	;cli
+	;hlt
+
+	movzx	ebx, word [esi + FAT12_BPB.sectorsPerFat]
+	shl	ebx, 1
+	add	bx, word [esi + FAT12_BPB.reservedSectors]
+	add	ebx, dword [esi + FAT12_BPB.hiddenSectors]
+	add	eax, ebx
+
+	; is root?
+	mov	edi, [fatDirectoryPtr]
+	cmp	word [edi + FAT12_Directory.firstCluster], 0
+	jz	.exit
+
+	; not root :(
+	;movzx	ebx, word [esi + FAT12_BPB.rootEntriesCount]
+	;shr	ebx, 4
+	;sub	ebx, 2
+	;add	eax, ebx
+	mov	bx, [esi + FAT12_BPB.rootEntriesCount]
+	shr	bx, 4
+	sub	bx, 2
+	add	ax, bx
+
+.exit:
+	rpop
+	ret
+
+ClusterToSector_NonRoot:
+	rpush	ebx, esi, edi
 
 	mov	esi, [bpbPtr]
 
@@ -111,16 +148,10 @@ ClusterToSector:
 	add	ebx, dword [esi + FAT12_BPB.hiddenSectors]
 	add	eax, ebx
 
-	; is root?
-	mov	esi, [fatDirectoryPtr]
-	cmp	word [esi + FAT12_Directory.firstCluster], 0
-	jz	.exit
-
-	; not root :(
-	mov	bx, [esi + FAT12_BPB.rootEntriesCount]
-	shr	bx, 4
-	sub	bx, 2
-	add	ax, bx
+	movzx	ebx, word [esi + FAT12_BPB.rootEntriesCount]
+	shr	ebx, 4
+	sub	ebx, 2
+	add	eax, ebx
 
 .exit:
 	rpop
@@ -181,14 +212,14 @@ FAT12_ReadWholeFile:
 	push	eax
 	call	Memory_Alloc
 	add	esp, 4
-;cli
-;hlt
+
 	mov	edi, eax
 	push	edi
 	movzx	eax, word [esi + FAT12_DirectoryEntry.cluster]
+
 .readLoop:
 	push	eax
-	call	ClusterToSector
+	call	ClusterToSector_NonRoot
 
 	push	edi
 	push	eax
