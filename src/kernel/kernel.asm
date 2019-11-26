@@ -83,9 +83,27 @@ Init32:
 	call	FAT12_Init
 
 	call	FAT12_OpenRoot
-	mov	ecx, 10
-.fatLoop:
+;	mov	ecx, 10
+;.fatLoop:
+;	call	FAT12_ReadDirectory
+;
+;	mov	edi, [fatEntry]
+;	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
+;	push	dword [fatEntry]
+;	push	dword .zz
+;	call	Terminal_Print
+;	add	esp, 8
+;
+;	loop	.fatLoop
+
 	call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
+	call	FAT12_ReadWholeFile
+
+	push	eax
+	call	Terminal_Print
+	add	esp, 4
 
 	mov	edi, [fatEntry]
 	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
@@ -93,9 +111,6 @@ Init32:
 	push	dword .zz
 	call	Terminal_Print
 	add	esp, 8
-
-	loop	.fatLoop
-
 	cli
 	hlt
 	jmp	$

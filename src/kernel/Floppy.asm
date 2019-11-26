@@ -72,10 +72,14 @@ sti
 	hlt
 	cmp	[fdd_irq], byte 1
 	jz	%%wait
-	;mov	[fdd_irq], byte 0
 popf
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Wait for FDD to be ready for OUT command
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_wait_ready_out 0
 	push	eax
 	push	ecx
@@ -84,13 +88,8 @@ popf
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
-	;test	al, FDD_MSR_RQM
-	;jz	%%loop
-	;test	al, FDD_MSR_DIO
-	;jnz	%%loop
 	and	al, 11000000b
 	cmp	al, 10000000b
-	;jnz	%%loop
 	jz	%%ok
 	hlt
 	loop	%%loop
@@ -98,13 +97,17 @@ popf
 	push	timeoutMsg
 	call	Terminal_Print
 	add	esp, 4
-	;jmp	%%ok
 %%ok:
 	pop	edx
 	pop	ecx
 	pop	eax
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Wait for FDD to be ready for IN command
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_wait_ready_in 0
 	push	eax
 	push	ecx
@@ -113,31 +116,28 @@ popf
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
-	;test	al, FDD_MSR_RQM
-	;jz	%%loop
-	;test	al, FDD_MSR_DIO
-	;jz	%%loop
-	;;test	al, FDD_MSR_CB
-	;;jnz	%%loop
 	and	al, 11000000b
 	cmp	al, 11000000b
-	;jne	%%loop
-	;jmp	%%ok
 	je	%%ok
 
-	;hlt
 	loop	%%loop
 
 	push	timeoutMsg
 	call	Terminal_Print
 	add	esp, 4
-	jmp	$
 %%ok:
 	pop	edx
 	pop	ecx
 	pop	eax
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Writes one byte to FDD fifo buffer
+; Arguments:
+;	source/value of data byte
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_write 1
 	fdd_wait_ready_out
 	mov	dx, FDD_REG_DATA_FIFO
@@ -147,6 +147,13 @@ popf
 	out	dx, al
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Reads one byte from FDD fifo buffer
+; Arguments:
+;	destination of data byte
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_read 1
 	fdd_wait_ready_in
 	mov	dx, FDD_REG_DATA_FIFO
@@ -154,70 +161,38 @@ popf
 	%ifnidni %1, al
 		mov	%1, al
 	%endif
-	;%if %1 = al
-	;	%error wtf
-		;mov	%1, al
-	;%endif
-	;%ifidni %1, al
-	;	%error Invalid register!
-	;%endif
 %endmacro
 
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Executes FDD command with specified parameters
+; Arguments:
+;	Command code
+;	Arguments to command
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_exec 1-*
 	push	eax
 	push	edx
-	;fdd_wait_ready_out
-
-	;mov	ebx, 0
-	;mov	edx, 0
-
-	;mov	dx, FDD_REG_DATA_FIFO
-	;mov	al, %1
-	;out	dx, al
-
-	; push	eax
-	; push	edx
-	; push	outo
-	; call	Terminal_Print
-	; add	esp, 12
 
 	%rep %0
 		%if %1 = al || %1 = dl || %1 = dh
 			%error Invalid register!
 		%endif
 
-		;fdd_wait_ready_out
-		;mov	dx, FDD_REG_DATA_FIFO
-		;mov	al, %1
-		;out	dx, al
 		fdd_write %1
 		%rotate 1
-
-		; push	eax
-		; push	edx
-		; push	outo
-		; call	Terminal_Print
-		; add	esp, 12
 	%endrep
 
 	pop	edx
 	pop	eax
 %endmacro
 
-;%macro fdd_read 1
-;	;push	eax
-;	push	edx
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-;	;fdd_wait_ready_in
-;	;mov	dx, FDD_REG_DATA_FIFO
-;	;in	%1, dx
-;	fdd_read %1
+; Floppy IRQ
 ;
-;	pop	edx
-;	;pop	eax
-;%endmacro
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_IRQ:
 	or	[fdd_irq], byte 1
 
@@ -231,9 +206,14 @@ Floppy_IRQ:
 outo db "Port: %x, Out: %x",0xA,0
 
 ;buffer dd 0
-buffer times 1024 db 0
+buffer times 512 db 0
 fdd_irq db 0
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Initializes FDD subsystem
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Init:
 	;push	512 * 2880
 	;call	Memory_Alloc
@@ -255,6 +235,13 @@ Floppy_Init:
 .version db "FDD Version: %x",0xA,0
 .lock db "FDD Lock: %x",0xA,0
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Internal
+;
+; Resets the floppy controller
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Reset:
 	; reset
 	mov	dx, FDD_REG_DIGITAL_OUT
@@ -282,7 +269,6 @@ Floppy_Reset:
 	fdd_exec FDD_CMD_SENSE_INTERRUPT
 	fdd_read al
 	fdd_read al
-	;loop	.senseIrq
 	dec	ecx
 	jnz	.senseIrq
 
@@ -290,6 +276,13 @@ Floppy_Reset:
 	fdd_exec FDD_CMD_SPECIFY, 0xDF, 0x02
 	ret
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Internal
+;
+; Recalibrates the FDD
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Recalibrate:
 	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA
@@ -316,6 +309,13 @@ Floppy_Recalibrate:
 	ret
 .status db "FDD Status: %x",0xA,0
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Internal
+;
+; Locks the configuration of FDD
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Lock:
 	fdd_exec FDD_CMD_OPTION_MULTITRACK | FDD_CMD_LOCK
 	fdd_read al
@@ -325,7 +325,7 @@ Floppy_Lock:
 ;
 ; Floppy - Seek track
 ; Parameters:
-;	(ebp + 8) - track
+;	[ebp + 8] - track
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Seek:
@@ -353,8 +353,8 @@ Floppy_Seek:
 ;
 ; Floppy - Read
 ; Parameters:
-;	(ebp +  8) - lba
-;	(ebp + 12) - buffer
+;	[ebp +  8] - lba
+;	[ebp + 12] - buffer
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Read:
@@ -406,10 +406,6 @@ Floppy_Read:
 	or	ch, 0 ; drive number
 	mov	ah, al
 
-	mov	[.zazaAH], ah
-	mov	[.zazaCL], cl
-	mov	[.zazaCH], ch
-
 	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, bh, cl, 2, 1, 0x1b, 0xff
 	;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, 0, 0, 0, 2, 2, 18, 0x1b, 0xff
 
@@ -450,6 +446,7 @@ Floppy_Read:
 ;
 ;	loop	.loop_status
 
+	; TODO check these values
 	fdd_read	[.statusST0]
 	fdd_read	[.statusST1]
 	fdd_read	[.statusST2]
@@ -471,13 +468,6 @@ Floppy_Read:
 	push	eax
 	mov	al, [.statusST2]
 	push	eax
-
-	push	dword [.zazaCH]
-	push	dword [.zazaCL]
-	push	dword [.zazaAH]
-	push	.zaza
-	call	Terminal_Print
-	add	esp, 16
 
 	push	.statusMsg2
 	call	Terminal_Print
@@ -502,10 +492,6 @@ Floppy_Read:
 .statusBuffer times 8 db 0
 .statusMsg db 0xA,"Status: %P %P",0xA,0
 .errorMsg db "Floppy failed!",0
-.zaza db "AH: %x, CL: %x, CH: %x",0xA,0
-.zazaAH dd 0
-.zazaCL dd 0
-.zazaCH dd 0
 
 .statusST0 db 0
 .statusST1 db 0

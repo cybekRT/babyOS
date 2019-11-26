@@ -5,62 +5,36 @@ fatPtr dd 0
 fatDirectoryPtr dd 0
 fatEntry dd 0
 
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Initialize FAT12 routines
 ;
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAT12_Init:
 	rpush	eax, ebx, ecx, edx
 
 	; Alloc BPB buffer
 	push	dword 512
-	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	call	Memory_Alloc
 	add	esp, 4
 	mov	[bpbPtr], eax
 
+	; Read BPB
 	push	dword [bpbPtr]
 	push	dword 0
 	call	Floppy_Read
 	add	esp, 8
 
-	;mov	es, ax
-
-	; Read BPB with BIOS function
-	;mov	ah, 02h
-	;mov	al, 1
-	;mov	ch, 0
-	;mov	cl, 1
-	;mov	dh, 0
-	;mov	dl, 0
-	;mov	bx, 0
-	;int	13h
-	;jc	Panic
-
-	; Update BPB about drive number from bootloader
-	;mov	al, [cs:driveNumber]
-	;mov	[es:FAT12_BPB.driveNumber], al
-
 	; Alloc FAT buffer
-	push	dword 512*9 ; FIXME from BPB?
+	push	dword 512*9 ; FIXME from BPB
 	call	Memory_Alloc
-	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	mov	[fatPtr], eax
 	add	esp, 4
 
 	; Read FAT
-	;push	ax
-	;push	word [es : FAT12_BPB.sectorsPerFat]
-	;mov	ax, [es : FAT12_BPB.reservedSectors]
-	;add	ax, [es : FAT12_BPB.hiddenSectors]
-	;push	ax
-	;call	ReadSector
-	;add	sp, 6
-
 	mov	ecx, 9
 	push	dword [fatPtr]
-	push	dword 1
+	push	dword 1 ; FIXME from BPB
 	mov	ebp, esp
 .loop:
 	call	Floppy_Read
@@ -74,26 +48,20 @@ FAT12_Init:
 	; Alloc FAT entry buffer
 	push	dword FAT12_Directory_size
 	call	Memory_Alloc
-	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
 	mov	[fatDirectoryPtr], eax
 	add	esp, 4
 
 	rpop
 	ret
 
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Open root directory
 ;
-; Return:
-;	ax		-	directory handle
-;
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAT12_OpenRoot:
 	rpush	esi
 
-	;push	word [fatDirectoryPtr]
-	;pop	es
 	mov	esi, [fatDirectoryPtr]
 
 	mov	word [esi + FAT12_Directory.firstCluster], 0
@@ -103,30 +71,38 @@ FAT12_OpenRoot:
 	rpop
 	ret
 
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Close directory handle
 ;
 ; Arguments:
-;	(ebp + 8)	-	directory handle
+;	[ebp + 8]	-	directory handle
 ;
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAT12_CloseDirectory:
 	rpush	ebp
 
 	push	word [ebp + 8]
-	;ApiCall	INT_API_MEMORY, MEMORY_FREE
 	call	Memory_Free
 	add	esp, 4
 
 	rpop
 	ret
 
-; eax - cluster
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Internal
+;
+; Converts cluster id to LBA
+; Arguments:
+;	eax	-	cluster id
+; Returns:
+;	eax	-	LBA
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ClusterToSector:
 	rpush	ebx, esi
 
-	;mov	es, [cs:bpbPtr]
 	mov	esi, [bpbPtr]
 
 	movzx	ebx, word [esi + FAT12_BPB.sectorsPerFat]
@@ -136,12 +112,8 @@ ClusterToSector:
 	add	eax, ebx
 
 	; is root?
-	;push	es
-	;push	word [cs:fatDirectoryPtr]
 	mov	esi, [fatDirectoryPtr]
-	;pop	es
 	cmp	word [esi + FAT12_Directory.firstCluster], 0
-	;pop	es
 	jz	.exit
 
 	; not root :(
@@ -154,7 +126,17 @@ ClusterToSector:
 	rpop
 	ret
 
-; ax - cluster
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Internal
+;
+; Gets next cluster id
+; Arguments:
+;	eax	-	current cluster
+; Returns:
+;	eax	-	next cluster
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 NextCluster:
 	rpush	ebx, esi
 
@@ -163,8 +145,6 @@ NextCluster:
 	shr	bx, 1
 	add	bx, ax
 
-	;push	word [fatPtr]
-	;pop	es
 	mov	esi, [fatPtr]
 	mov	bx, [esi + ebx]
 	test	ax, 1
@@ -180,7 +160,7 @@ NextCluster:
 	jmp	.end
 
 .end:
-	mov	ax, bx
+	movzx	eax, bx
 	rpop
 	ret
 
@@ -189,66 +169,59 @@ NextCluster:
 ; Reads whole file from current directory entry
 ;
 ;;;;;;;;;;
+; FIXME reads wrong sectors!
 FAT12_ReadWholeFile:
-	rpush	bx, es
+	rpush	ebx, esi
 
-	push	word [cs:fatEntry]
-	pop	es
-	movzx	eax, word [es : FAT12_DirectoryEntry.size]
-	add	ax, 511
-	and	ax, 0xfe00
-	push	ax
-	;ApiCall	INT_API_MEMORY, MEMORY_ALLOC_BYTES
+	mov	esi, [fatEntry]
+
+	movzx	eax, word [esi + FAT12_DirectoryEntry.size]
+	add	eax, 511
+	and	eax, 0xfe00
+	push	eax
 	call	Memory_Alloc
-	add	sp, 2
-
-	mov	di, ax
-	push	di
-	mov	ax, [es : FAT12_DirectoryEntry.cluster]
+	add	esp, 4
+;cli
+;hlt
+	mov	edi, eax
+	push	edi
+	movzx	eax, word [esi + FAT12_DirectoryEntry.cluster]
 .readLoop:
-	push	ax
+	push	eax
 	call	ClusterToSector
 
-	push	di
-	push	1
-	push	ax
-	;call	ReadSector
-	add	sp, 6
+	push	edi
+	push	eax
+	call	Floppy_Read
+	add	esp, 8
 
-	add	di, 512/16
-	pop	ax
+	add	edi, 512
+	pop	eax
 	call	NextCluster
 
-	cmp	ax, CLUSTER_LAST
+	cmp	eax, CLUSTER_LAST
 	jb	.readLoop
 
 ; Return
-	pop	ax
+	pop	eax
 	rpop
 	ret
 
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Reads next directory entry
+; Reads next entry from current directory
+; moves to next entry and reads sector if needed
 ;
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAT12_ReadDirectory:
 	rpush	eax, esi
 
-	;push	word [cs:fatDirectoryPtr]
-	;pop	es
 	mov	esi, [fatDirectoryPtr]
 
 	cmp	word [esi + FAT12_Directory.currentOffset], 0
 	jnz	.dontReadNextSector
 
 	; Reading data sector
-	;mov	ax, es
-	;add	ax, FAT12_Directory.buffer / 16
-	;shr	ax, 4
-	;push	ax
-	;push	1
-
 	push	esi
 	add	[esp], dword FAT12_Directory.buffer
 	
@@ -256,7 +229,6 @@ FAT12_ReadDirectory:
 	call	ClusterToSector
 	push	eax
 
-	;call	ReadSector
 	call	Floppy_Read
 	add	sp, 8
 
@@ -265,38 +237,27 @@ FAT12_ReadDirectory:
 	add	eax, FAT12_Directory.buffer
 	add	eax, esi
 
-	;shr	ax, 4
-	;mov	bx, es
-	;add	ax, bx
-
 	mov	[fatEntry], eax
 	add	word [esi + FAT12_Directory.currentOffset], FAT12_DirectoryEntry_size
 
 	rpop
 	ret
 
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Changes directory to current entry
+; Moves directory entry pointer to currently selected entry
 ;
-; Arguments:
-;	(bp + 4)--- fatEntry	-	directory entry
-;
-;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAT12_ChangeDirectory:
-	rpush	bp, ax, es
+	rpush	ebp, eax, esi
 
-	push	word [cs:fatEntry]
-	pop	es
+	mov	esi, [fatEntry]
+	mov	ax, [esi + FAT12_DirectoryEntry.cluster]
 
-	mov	ax, [es : FAT12_DirectoryEntry.cluster]
-
-	push	word [cs:fatDirectoryPtr]
-	pop	es
-
-	mov	[es : FAT12_Directory.firstCluster], ax
-	mov	[es : FAT12_Directory.currentCluster], ax
-	mov	word [es : FAT12_Directory.currentOffset], 0
+	mov	esi, [fatDirectoryPtr]
+	mov	[esi + FAT12_Directory.firstCluster], ax
+	mov	[esi + FAT12_Directory.currentCluster], ax
+	mov	word [esi + FAT12_Directory.currentOffset], 0
 
 	rpop
 	ret

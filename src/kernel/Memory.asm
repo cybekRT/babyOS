@@ -284,7 +284,7 @@ Memory_InitInternal:
 ;
 ; Memory alloc
 ; Arguments:
-; 	(ebp + 8)	-	size
+; 	[ebp + 8]	-	size
 ; Return:
 ;	eax		-	pointer
 ;
