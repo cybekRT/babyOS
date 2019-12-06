@@ -68,7 +68,7 @@ ISR_PIT:
 	;xchg bx, bx
 	;jmp $
 
-	;pushf
+	pushf
 
 	add	dword [_ticks + 0], 1
 	adc	dword [_ticks + 4], 0
@@ -88,9 +88,9 @@ ISR_PIT:
 	;cmp	dword [omg], 200
 	;jne	x
 	;mov	dword [omg], 0
-	;popf
+	popf
 	;iret
-	call	Process_Scheduler
+	;call	Process_Scheduler
 
 x:
 	;mov	al, 0x20

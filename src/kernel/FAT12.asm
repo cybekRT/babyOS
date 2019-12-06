@@ -22,7 +22,7 @@ FAT12_Init:
 	; Read BPB
 	push	dword [bpbPtr]
 	push	dword 0
-	call	Floppy_Read
+	;call	Floppy_Read
 	add	esp, 8
 
 	; Alloc FAT buffer
@@ -37,7 +37,7 @@ FAT12_Init:
 	push	dword 1 ; FIXME from BPB
 	mov	ebp, esp
 .loop:
-	call	Floppy_Read
+	;call	Floppy_Read
 
 	inc	dword [ebp + 0]
 	add	dword [ebp + 4], 512
@@ -259,9 +259,10 @@ FAT12_ReadDirectory:
 	movzx	eax, word [esi + FAT12_Directory.currentCluster]
 	call	ClusterToSector
 	push	eax
-
+xchg bx, bx
 	call	Floppy_Read
-	add	sp, 8
+	add	esp, 8
+xchg bx, bx
 
 .dontReadNextSector:
 	movzx	eax, word [esi + FAT12_Directory.currentOffset]

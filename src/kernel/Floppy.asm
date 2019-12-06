@@ -70,7 +70,7 @@ pushf
 sti
 %%wait:
 	hlt
-	cmp	[fdd_irq], byte 1
+	test	[fdd_irq], byte 1
 	jz	%%wait
 popf
 %endmacro
@@ -139,7 +139,7 @@ popf
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_write 1
-	fdd_wait_ready_out
+	;fdd_wait_ready_out
 	mov	dx, FDD_REG_DATA_FIFO
 	%ifnidni %1, al
 		mov	al, %1
@@ -155,7 +155,7 @@ popf
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_read 1
-	fdd_wait_ready_in
+	;fdd_wait_ready_in
 	mov	dx, FDD_REG_DATA_FIFO
 	in	al, dx
 	%ifnidni %1, al
@@ -245,7 +245,7 @@ Floppy_Init:
 Floppy_Reset:
 	; reset
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, !FDD_DOR_RESET; | FDD_DOR_IRQ
+	mov	al, !FDD_DOR_RESET | FDD_DOR_IRQ
 	out	dx, al
 
 	; wait 10ms
@@ -260,20 +260,60 @@ Floppy_Reset:
 
 	; un-reset
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_RESET; | FDD_DOR_IRQ
+	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ
 	out	dx, al
 
 
-	mov	ecx, 4
-.senseIrq:
-	fdd_exec FDD_CMD_SENSE_INTERRUPT
-	fdd_read al
-	fdd_read al
-	dec	ecx
-	jnz	.senseIrq
+;	mov	ecx, 4
+;.senseIrq:
+;	fdd_exec FDD_CMD_SENSE_INTERRUPT
+;	fdd_read al
+;	fdd_read al
+;	dec	ecx
+;	jnz	.senseIrq
+
+	fdd_wait_irq
 
 	; Specify
-	fdd_exec FDD_CMD_SPECIFY, 0xDF, 0x02
+	fdd_exec FDD_CMD_SPECIFY, (13 << 4 | 15 << 0), (1 << 1 | 0)
+	ret
+
+motorEnabled db 0
+Floppy_EnableMotor:
+	rpush	ax, dx
+	test	[motorEnabled], byte 1
+	jnz	.enabled
+
+	mov	dx, FDD_REG_DIGITAL_OUT
+	in	al, dx
+
+	or	al, FDD_DOR_MOTA | FDD_DOR_DSELA
+	out	dx, al
+
+	push	dword 300
+	call	Timer_Delay
+	add	esp, 4
+	mov	[motorEnabled], byte 1
+
+.enabled:
+	rpop
+	ret
+
+Floppy_DisableMotor:
+	rpush	ax, dx
+	test	[motorEnabled], byte 1
+	jz	.disabled
+
+	mov	dx, FDD_REG_DIGITAL_OUT
+	in	al, dx
+
+	and	al, ~(FDD_DOR_MOTA | FDD_DOR_DSELA)
+	out	dx, al
+
+	mov	[motorEnabled], byte 0
+
+.disabled:
+	rpop
 	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -293,9 +333,13 @@ Floppy_Recalibrate:
 	call	Timer_Delay
 	add	esp, 4
 
+	fdd_wait_ready_out
 	mov	eax, 0
 	fdd_exec FDD_CMD_RECALIBRATE, 0x00
 
+	;fdd_wait_irq
+
+	fdd_wait_ready_out
 	fdd_exec FDD_CMD_SENSE_INTERRUPT
 	fdd_read al
 	xchg	al, ah
@@ -341,6 +385,9 @@ Floppy_Seek:
 	mov	ah, [ebp + 8]
 	fdd_exec FDD_CMD_SEEK, 0, ah
 
+	fdd_wait_ready_out
+
+	;fdd_wait_irq
 	fdd_exec FDD_CMD_SENSE_INTERRUPT
 	fdd_read al
 	fdd_read al
@@ -360,16 +407,21 @@ Floppy_Seek:
 Floppy_Read:
 	rpush	ebp, eax, ebx, ecx, edx, edi
 
+xchg bx, bx
 	call	Floppy_Reset
+xchg bx, bx
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA
+	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA | FDD_DOR_IRQ
 	out	dx, al
+
+	;call	Floppy_EnableMotor
 
 	;and	[ebp + 8], dword 0b1
 
 	; LBA 2 CHS
 	mov	eax, [ebp + 8]
 	mov	bl, 18 ; [sectorsPerTrack]
+xchg bx, bx
 	div	bl
 
 	mov	cl, ah ; Sectors
@@ -384,7 +436,9 @@ Floppy_Read:
 
 	movzx	eax, al
 	push	eax
+xchg bx, bx
 	call	Floppy_Seek
+xchg bx, bx
 	add	esp, 4
 
 	;cli
@@ -396,7 +450,7 @@ Floppy_Read:
 	push	dword [ebp + 12]
 	push	dword [ebp + 8]
 	push	.msg
-	call	Terminal_Print
+	;call	Terminal_Print
 	add	esp, 12
 
 	; head -> ch
@@ -406,45 +460,96 @@ Floppy_Read:
 	or	ch, 0 ; drive number
 	mov	ah, al
 
-	fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, bh, cl, 2, 1, 0x1b, 0xff
-	;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, 0, 0, 0, 2, 2, 18, 0x1b, 0xff
+	push	ax
 
-	mov	edi, [ebp + 12]
-	mov	ecx, 512
-.loop:
-	;fdd_wait_ready_in
+	;initialize_floppy_DMA:
+	; set DMA channel 2 to transfer data from 0x1000 - 0x33ff in memory
+	; paging must map this _physical_ memory elsewhere and _pin_ it from paging to disk!
+	; set the counter to 0x23ff, the length of a track on a 1.44 MiB floppy - 1 (assuming 512 byte sectors)
+	; transfer length = counter + 1
+	mov	al, 0x06
+	out 0x0a, al      ; mask DMA channel 2 and 0 (assuming 0 is already masked)
 
-	;mov	dx, FDD_REG_DATA_FIFO
-	;in	al, dx
-	fdd_read al
+	mov	al, 0xFF
+	out 0x0c, al      ; reset the master flip-flop
 
-	mov	[edi], al
-	inc	edi
+	mov	ax, .buffer
 
-	movzx	ebx, al
-	push	ebx
-	push	.msg2
+	;mov	al, 0
+	out 0x04, al         ; address to 0 (low byte)
+
+	;mov	al, 0x10
+	mov	al, ah
+	out 0x04, al      ; address to 0x10 (high byte)
+
+	mov	al, 0xFF
+	out 0x0c, al      ; reset the master flip-flop (again!!!)
+
+	mov	al, 0xFF
+	out 0x05, al      ; count to 0x00 (low byte)
+
+	mov	al, 0x23
+	out 0x05, al      ; count to 0x02 (high byte),
+
+	mov	al, 0
+	out 0x81, al         ; external page register to 0 for total address of 00 10 00
+
+	mov	al, 0x02
+	out 0x0a, al      ; unmask DMA channel 2
+
+	pop	ax
+
+	;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, bh, cl, 2, 1, 0x1b, 0xff
+
+
+	;fdd_wait_ready_out
+	
+	mov	dx, FDD_REG_DATA_FIFO
+
+	mov	al, FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA
+	out	dx, al
+	mov	al, ch
+	out	dx, al
+	mov	al, ah
+	out	dx, al
+	mov	al, bh
+	out	dx, al
+	mov	al, cl
+	out	dx, al
+	mov	al, 2
+	out	dx, al
+	mov	al, 1
+	out	dx, al
+	mov	al, 0x1b
+	out	dx, al
+	mov	al, 0xff
+	out	dx, al
+
+	fdd_wait_irq
+
+	;push	.msg3
 	;call	Terminal_Print
-	add	esp, 8
-
-	loop	.loop
-
-	;push	dword 100
-	;call	Timer_Delay
 	;add	esp, 4
 
-;	mov	edi, .statusBuffer
-;	mov	ecx, 7
-;.loop_status:
-;	fdd_wait_ready_in
-;
-;	mov	dx, FDD_REG_DATA_FIFO
-;	in	al, dx
+
+	;;;;;;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, 0, 0, 0, 2, 2, 18, 0x1b, 0xff
+;jmp $
+
+;	mov	edi, [ebp + 12]
+;	mov	ecx, 512
+;.loop:
+;	fdd_read al
 ;
 ;	mov	[edi], al
 ;	inc	edi
-;
-;	loop	.loop_status
+
+	;movzx	ebx, al
+	;push	ebx
+	;push	.msg2
+	;call	Terminal_Print
+	;add	esp, 8
+
+;	loop	.loop
 
 	; TODO check these values
 	fdd_read	[.statusST0]
@@ -454,6 +559,14 @@ Floppy_Read:
 	fdd_read	[.statusH]
 	fdd_read	[.statusR]
 	fdd_read	[.statusN]
+
+
+	; Copy tmp buffer to destination
+	;mov	esi, .buffer
+	;mov	edi, [ebp + 12]
+	;mov	ecx, 512
+	;rep movsb
+
 
 	;push	dword [.statusBuffer]
 	;push	dword [.statusBuffer+4]
@@ -470,15 +583,17 @@ Floppy_Read:
 	push	eax
 
 	push	.statusMsg2
-	call	Terminal_Print
+	;call	Terminal_Print
 	add	esp, 16
 
 	;test	  [.statusST0], byte 11000000b	      ; test sr0 is 0xC0
 	;jnz	  .error
 
-	;push	dword 300
+	;push	dword 100
 	;call	Timer_Delay
 	;add	esp, 4
+
+	xchg bx, bx
 
 	rpop
 	ret
@@ -489,9 +604,18 @@ Floppy_Read:
 
 .msg db "Reading sector %u at %p",0xA,0
 .msg2 db "%c",0
+.msg3 db "Reading OK",0xA,0
 .statusBuffer times 8 db 0
 .statusMsg db 0xA,"Status: %P %P",0xA,0
 .errorMsg db "Floppy failed!",0
+
+db "================"
+align 32
+.buffer times 512 db 0
+db "================"
+times 8192 db 0
+
+db "=== END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER ==="
 
 .statusST0 db 0
 .statusST1 db 0

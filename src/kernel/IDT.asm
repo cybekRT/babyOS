@@ -127,8 +127,10 @@ IDT_RegisterISR:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ISR_GeneralProtectionFault:
 	rpush	ebp, eax, ecx, esi, edi
-	xchg	bx, bx
-	;jmp	Panic
+	;xchg	bx, bx
+	jmp	Panic
+
+	;call	Terminal_Init
 
 	push	.msg
 	call	Terminal_Print

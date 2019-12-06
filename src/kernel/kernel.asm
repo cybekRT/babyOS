@@ -80,8 +80,10 @@ Init32:
 	call	Timer_Init
 	
 	call	Floppy_Init
+xchg bx, bx
 	call	FAT12_Init
 
+xchg bx, bx
 	call	FAT12_OpenRoot
 ;	mov	ecx, 10
 ;.fatLoop:
@@ -96,10 +98,16 @@ Init32:
 ;
 ;	loop	.fatLoop
 
+xchg bx, bx
+
 	call	FAT12_ReadDirectory
+xchg bx, bx
 	call	FAT12_ReadDirectory
+xchg bx, bx
 	call	FAT12_ReadDirectory
+xchg bx, bx
 	call	FAT12_ReadWholeFile
+xchg bx, bx
 
 	push	eax
 	call	Terminal_Print
@@ -224,7 +232,11 @@ PidB:
 
 Panic:
 	pushf
-	push	dword [esp + 4]
+	push	dword [esp + 4] ; eip
+
+	;mov	eax, [esp + 4]
+	;xchg	bx, bx
+
 	push	esp
 	push	ebp
 	push	edi
