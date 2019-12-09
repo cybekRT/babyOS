@@ -22,7 +22,7 @@ FAT12_Init:
 	; Read BPB
 	push	dword [bpbPtr]
 	push	dword 0
-	;call	Floppy_Read
+	call	Floppy_Read
 	add	esp, 8
 
 	; Alloc FAT buffer
@@ -37,7 +37,7 @@ FAT12_Init:
 	push	dword 1 ; FIXME from BPB
 	mov	ebp, esp
 .loop:
-	;call	Floppy_Read
+	call	Floppy_Read
 
 	inc	dword [ebp + 0]
 	add	dword [ebp + 4], 512
@@ -245,7 +245,7 @@ FAT12_ReadWholeFile:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 FAT12_ReadDirectory:
-	rpush	eax, esi
+	rpush	eax, esi, edi
 
 	mov	esi, [fatDirectoryPtr]
 
@@ -272,8 +272,16 @@ xchg bx, bx
 	mov	[fatEntry], eax
 	add	word [esi + FAT12_Directory.currentOffset], FAT12_DirectoryEntry_size
 
+	mov	edi, [fatEntry]
+	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
+	push	dword [fatEntry]
+	push	dword .msg
+	call	Terminal_Print
+	add	esp, 8
+
 	rpop
 	ret
+.msg db "Current file: '%s'",0xA,0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;

@@ -71,6 +71,11 @@ IDT_Init:
 	call	IDT_RegisterISR
 	add	esp, 8
 
+	push	dword INT_DOUBLE_FAULT
+	push	ISR_DUMMY2
+	call	IDT_RegisterISR
+	add	esp, 8
+
 	push	dword IRQ2INT(IRQ_KEYBOARD)
 	push	ISR_DUMMY
 	call	IDT_RegisterISR

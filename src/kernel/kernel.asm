@@ -68,10 +68,10 @@ Init32:
 	call	Memory_Init
 
 	; Alloc stack
-	;push	8192
-	;call	Memory_Alloc
-	;add	eax, 8192
-	;mov	esp, eax
+	push	8192
+	call	Memory_Alloc
+	add	eax, 8192
+	mov	esp, eax
 
 	;xchg bx, bx
 

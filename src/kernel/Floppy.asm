@@ -420,8 +420,9 @@ xchg bx, bx
 
 	; LBA 2 CHS
 	mov	eax, [ebp + 8]
-	mov	bl, 18 ; [sectorsPerTrack]
 xchg bx, bx
+	mov	bl, 18 ; [sectorsPerTrack]
+;xchg bx, bx
 	div	bl
 
 	mov	cl, ah ; Sectors
@@ -450,7 +451,7 @@ xchg bx, bx
 	push	dword [ebp + 12]
 	push	dword [ebp + 8]
 	push	.msg
-	;call	Terminal_Print
+	call	Terminal_Print
 	add	esp, 12
 
 	; head -> ch
@@ -562,10 +563,10 @@ xchg bx, bx
 
 
 	; Copy tmp buffer to destination
-	;mov	esi, .buffer
-	;mov	edi, [ebp + 12]
-	;mov	ecx, 512
-	;rep movsb
+	mov	esi, .buffer
+	mov	edi, [ebp + 12]
+	mov	ecx, 512
+	rep movsb
 
 
 	;push	dword [.statusBuffer]

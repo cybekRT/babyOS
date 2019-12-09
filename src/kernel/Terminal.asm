@@ -164,7 +164,7 @@ Terminal_CR:
 	ret
 
 Terminal_Scroll:
-	ret
+	;ret
 	;xchg	bx, bx
 
 	; Scroll
