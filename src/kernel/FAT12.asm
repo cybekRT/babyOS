@@ -200,7 +200,6 @@ NextCluster:
 ; Reads whole file from current directory entry
 ;
 ;;;;;;;;;;
-; FIXME reads wrong sectors!
 FAT12_ReadWholeFile:
 	rpush	ebx, esi
 
@@ -231,6 +230,7 @@ FAT12_ReadWholeFile:
 	call	NextCluster
 
 	cmp	eax, CLUSTER_LAST
+	; TODO check for file size, clear buffer if more bytes read
 	jb	.readLoop
 
 ; Return
@@ -259,10 +259,10 @@ FAT12_ReadDirectory:
 	movzx	eax, word [esi + FAT12_Directory.currentCluster]
 	call	ClusterToSector
 	push	eax
-xchg bx, bx
+
 	call	Floppy_Read
 	add	esp, 8
-xchg bx, bx
+
 
 .dontReadNextSector:
 	movzx	eax, word [esi + FAT12_Directory.currentOffset]

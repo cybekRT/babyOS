@@ -51,6 +51,8 @@ Init16:
 [bits 32]
 tmpBuffer times 1024 db 0
 Init32:
+	cli
+
 	mov	bx, 0x10
 	mov	ds, bx
 	mov	es, bx
@@ -65,9 +67,11 @@ Init32:
 
 	; Initialize kernel main services
 	call	Terminal_Init
+	print	"Memory init"
 	call	Memory_Init
 
 	; Alloc stack
+	print	"Allocating stack!"
 	push	8192
 	call	Memory_Alloc
 	add	eax, 8192
@@ -76,14 +80,39 @@ Init32:
 	;xchg bx, bx
 
 	; Initialize rest of kernel services
+	print	"Init scheduler"
 	call	Process_Init
+	print	"Init timer"
 	call	Timer_Init
 	
+	print	"Init floppy"
 	call	Floppy_Init
-xchg bx, bx
+	print	"Floppy inited!"
+
+;	mov	ecx, 20
+;	push	dword yoloBuffer
+;	push	0
+;.tmpLoop:
+;
+;	push	dword	1000
+;	;call	Timer_Delay
+;	add	esp, 4
+;
+;	call	Floppy_Read
+;	add	[esp + 0], dword 1
+;	add	[esp + 4], dword 512
+;	loop	.tmpLoop
+;
+;	pop	ecx
+;	pop	eax
+;	hlt
+;	cli
+;	jmp $
+
+;xchg bx, bx
 	call	FAT12_Init
 
-xchg bx, bx
+;xchg bx, bx
 	call	FAT12_OpenRoot
 ;	mov	ecx, 10
 ;.fatLoop:
@@ -98,33 +127,37 @@ xchg bx, bx
 ;
 ;	loop	.fatLoop
 
-xchg bx, bx
+;xchg bx, bx
 
 	call	FAT12_ReadDirectory
-xchg bx, bx
+;xchg bx, bx
 	call	FAT12_ReadDirectory
-xchg bx, bx
+;xchg bx, bx
 	call	FAT12_ReadDirectory
-xchg bx, bx
-	call	FAT12_ReadWholeFile
-xchg bx, bx
+	;call	FAT12_ReadDirectory
+;xchg bx, bx
+	;call	FAT12_ReadWholeFile
+;xchg bx, bx
+
+;cli
+;hlt
 
 	push	eax
 	call	Terminal_Print
 	add	esp, 4
 
-	mov	edi, [fatEntry]
-	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
-	push	dword [fatEntry]
-	push	dword .zz
-	call	Terminal_Print
-	add	esp, 8
-	cli
-	hlt
-	jmp	$
-
-.zz db "File: '%s'",0xA,0
-.xx db "YoLo",0
+;	mov	edi, [fatEntry]
+;	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
+;	push	dword [fatEntry]
+;	push	dword .zz
+;	call	Terminal_Print
+;	add	esp, 8
+;	cli
+;	hlt
+;	jmp	$
+;
+;.zz db "File: '%s'",0xA,0
+;.xx db "YoLo",0
 
 	push	tmpBuffer
 	push	dword 0
@@ -246,6 +279,14 @@ Panic:
 	push	ebx
 	push	eax
 	push	.panicMsg
+
+.fill_background:
+	mov	al, 10
+	mov	edi, 0xa0000
+	mov	ecx, 320*200
+	;rep	stosb
+
+	;call	Terminal_Init
 	call	Terminal_Print
 	add	esp, 11*4
 
@@ -309,4 +350,12 @@ times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 %include "FAT12.asm"
 
 align 32
-KERNEL_END equ $-$$ + 0x500
+
+;yoloBuffer times 512*20 db 0
+;yoloBuffer db 0
+
+KERNEL_END equ $-$$ + 0x500 ;+ (512 * 20)
+
+%if KERNEL_END >= 0x7c00
+	%error "Kernel too big!"
+%endif

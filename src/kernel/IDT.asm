@@ -133,7 +133,7 @@ IDT_RegisterISR:
 ISR_GeneralProtectionFault:
 	rpush	ebp, eax, ecx, esi, edi
 	;xchg	bx, bx
-	jmp	Panic
+	;jmp	Panic
 
 	;call	Terminal_Init
 

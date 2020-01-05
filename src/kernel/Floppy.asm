@@ -220,14 +220,18 @@ Floppy_Init:
 	;add	esp, 4
 	;mov	[buffer], eax
 
+	print	"FDC interrupts"
 	push	IRQ2INT(IRQ_FLOPPY)
 	push	Floppy_IRQ
 	call	IDT_RegisterISR
 	add	esp, 8
 	sti
 
+print	"FDC reset"
 	call	Floppy_Reset
+print	"FDC recalibrate"
 	call	Floppy_Recalibrate
+print	"FDC lock"
 	call	Floppy_Lock
 	ret
 
@@ -243,21 +247,25 @@ Floppy_Init:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Reset:
+print "  Reset"
 	; reset
 	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, !FDD_DOR_RESET | FDD_DOR_IRQ
 	out	dx, al
 
+print "  Wait"
 	; wait 10ms
 	push	dword 10
 	call	Timer_Delay
 	add	esp, 4
 
+print "  Data rate"
 	; datarate
 	mov	dx, FDD_REG_DATARATE_SELECT
 	mov	al, FDD_DSR_TYPE_144
 	out	dx, al
 
+print "  Deassert reset"
 	; un-reset
 	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ
@@ -272,8 +280,10 @@ Floppy_Reset:
 ;	dec	ecx
 ;	jnz	.senseIrq
 
+;print "  Wait IRQ"
 	fdd_wait_irq
 
+print "  Specify"
 	; Specify
 	fdd_exec FDD_CMD_SPECIFY, (13 << 4 | 15 << 0), (1 << 1 | 0)
 	ret
@@ -405,11 +415,8 @@ Floppy_Seek:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Read:
-	rpush	ebp, eax, ebx, ecx, edx, edi
+	rpush	ebp, eax, ebx, ecx, edx, esi, edi
 
-xchg bx, bx
-	call	Floppy_Reset
-xchg bx, bx
 	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA | FDD_DOR_IRQ
 	out	dx, al
@@ -420,9 +427,7 @@ xchg bx, bx
 
 	; LBA 2 CHS
 	mov	eax, [ebp + 8]
-xchg bx, bx
 	mov	bl, 18 ; [sectorsPerTrack]
-;xchg bx, bx
 	div	bl
 
 	mov	cl, ah ; Sectors
@@ -437,13 +442,8 @@ xchg bx, bx
 
 	movzx	eax, al
 	push	eax
-xchg bx, bx
 	call	Floppy_Seek
-xchg bx, bx
 	add	esp, 4
-
-	;cli
-	;hlt
 
 	; Start reading
 	;fdd_wait_ready_out
@@ -489,7 +489,7 @@ xchg bx, bx
 	mov	al, 0xFF
 	out 0x05, al      ; count to 0x00 (low byte)
 
-	mov	al, 0x23
+	mov	al, 0x1
 	out 0x05, al      ; count to 0x02 (high byte),
 
 	mov	al, 0
@@ -519,11 +519,11 @@ xchg bx, bx
 	out	dx, al
 	mov	al, 2
 	out	dx, al
-	mov	al, 1
+	mov	al, 0x1B
 	out	dx, al
 	mov	al, 0x1b
 	out	dx, al
-	mov	al, 0xff
+	mov	al, cl
 	out	dx, al
 
 	fdd_wait_irq
@@ -594,8 +594,6 @@ xchg bx, bx
 	;call	Timer_Delay
 	;add	esp, 4
 
-	xchg bx, bx
-
 	rpop
 	ret
 .error:
@@ -614,7 +612,7 @@ db "================"
 align 32
 .buffer times 512 db 0
 db "================"
-times 8192 db 0
+times 8192 db 0 ; TODO remove me, but after clearing this file and making sure floppy is working great
 
 db "=== END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER ==="
 

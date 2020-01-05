@@ -23,9 +23,9 @@ Terminal_Init:
 	push	dword 0xbaadf00d
 	push	dword 0xabcdef12
 	push	dword 0x4321
-	push	dword 2137
-	push	dword -2137
-	push	dword -2137
+	push	dword 2109
+	push	dword -2109
+	push	dword -2109
 	push	.testMsg
 	call	Terminal_Print
 	add	esp, 28
@@ -47,10 +47,12 @@ Terminal_Put:
 	; Special chars
 	mov	al, byte [ebp + 8]
 
-	cmp	al, 0xD ; carriage return
+	cmp	al, 0x0D ; carriage return
 	je	.CR
-	cmp	al, 0xA ; line feed
+	cmp	al, 0x0A ; line feed
 	je	.LF
+	cmp	al, 0x09 ; tab
+	je	.Tab
 	jmp	.normalChar
 
 .CR:
@@ -58,6 +60,9 @@ Terminal_Put:
 	jmp	.exit
 .LF:
 	call	Terminal_LF
+	jmp	.exit
+.Tab:
+	call	Terminal_Tab
 	jmp	.exit
 
 .normalChar:
@@ -143,6 +148,10 @@ Terminal_Put:
 	rpop
 	ret
 
+Terminal_CR:
+	mov	word [cursorX], 0
+	ret
+
 Terminal_LF:
 	mov	word [cursorX], 0
 	inc	word [cursorY]
@@ -159,24 +168,32 @@ Terminal_LF:
 .exit:
 	ret
 
-Terminal_CR:
-	mov	word [cursorX], 0
+Terminal_Tab:
+	rpush	ax, bx, ecx, dx
+
+	mov	dx, 0
+	mov	ax, word [cursorX]
+	mov	bx, 8
+	div	bx
+
+	test	dx, dx
+	jz	.exit
+
+	movzx	ecx, dx
+	push	dword ' '
+.loop:
+	call	Terminal_Put
+	loop	.loop
+	add	esp, 4
+
+.exit:
+	rpop
 	ret
 
 Terminal_Scroll:
-	;ret
-	;xchg	bx, bx
-
 	; Scroll
 	mov	esi, 0xa0000 + 320 * (fontHeight + fontHeight / 2)
-	; mov	edi, 0xa0000 + 320 * fontHeight / 2 != mov	edi, 0xa0000 + 320 * (fontHeight / 2)
-	;mov	edi, 0xa0000 + 320 * fontHeight / 2
 	mov	edi, 0xa0000 + 320 * (fontHeight / 2)
-	;dw 320 * fontHeight / 2
-	;dw 320 * (fontHeight / 2)
-	;dw 5 * fontHeight / 2
-	;dw 5 * (fontHeight / 2)
-	;dw fontHeight
 	mov	ecx, 320 * (200 / fontHeight - 1) * fontHeight
 	rep movsb
 	; Clear line

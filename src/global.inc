@@ -31,3 +31,12 @@
 %$ret:
 	%pop
 %endmacro
+
+%macro print 1
+	push	%%text
+	call	Terminal_Print
+	add	esp, 4
+	jmp	%%exit
+%%text db %1,0xA,0
+%%exit:
+%endmacro
