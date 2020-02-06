@@ -134,17 +134,28 @@ Init32:
 	call	FAT12_ReadDirectory
 ;xchg bx, bx
 	call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
 ;xchg bx, bx
-	;call	FAT12_ReadWholeFile
+	call	FAT12_ReadWholeFile
 ;xchg bx, bx
-
+	;mov	edi, [fatEntry]
+	;mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
+	;push	dword [fatEntry]
+	;push	dword .zz
+	;call	Terminal_Print
+	;add	esp, 8
+call Memory_PrintInfo
+jmp $
 ;cli
 ;hlt
-
+;jmp $
 	push	eax
 	call	Terminal_Print
 	add	esp, 4
+	;jmp $
 
 ;	mov	edi, [fatEntry]
 ;	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
@@ -156,7 +167,7 @@ Init32:
 ;	hlt
 ;	jmp	$
 ;
-;.zz db "File: '%s'",0xA,0
+.zz db "File: '%s'",0xA,0
 ;.xx db "YoLo",0
 
 	push	tmpBuffer

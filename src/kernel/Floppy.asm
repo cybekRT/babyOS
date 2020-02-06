@@ -64,8 +64,12 @@ FDD_CMD_OPTION_SKIP			equ 0x20
 
 timeoutMsg db "Floppy timeout...",0xA,0
 
-%macro fdd_wait_irq 0
-mov	[fdd_irq], byte 0
+%macro fdd_wait_irq_begin 0
+	mov	[fdd_irq], byte 0
+%endmacro
+
+%macro fdd_wait_irq_end 0
+;mov	[fdd_irq], byte 0
 pushf
 sti
 %%wait:
@@ -84,7 +88,7 @@ popf
 	push	eax
 	push	ecx
 	push	edx
-	mov	ecx, 100
+	mov	ecx, 1000
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
@@ -112,7 +116,7 @@ popf
 	push	eax
 	push	ecx
 	push	edx
-	mov	ecx, 100
+	mov	ecx, 1000
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
@@ -267,6 +271,8 @@ print "  Data rate"
 
 print "  Deassert reset"
 	; un-reset
+
+	fdd_wait_irq_begin
 	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ
 	out	dx, al
@@ -280,8 +286,8 @@ print "  Deassert reset"
 ;	dec	ecx
 ;	jnz	.senseIrq
 
-;print "  Wait IRQ"
-	fdd_wait_irq
+print "  Wait IRQ"
+	fdd_wait_irq_end
 
 print "  Specify"
 	; Specify
@@ -390,9 +396,14 @@ Floppy_Seek:
 	call	Terminal_Print
 	add	esp, 8
 
+	mov	ah, [ebp + 8]
+	cmp	ah, [.lastTrack]
+	je	.exit
+
+	print "  Seek!"
 	fdd_wait_ready_out
 
-	mov	ah, [ebp + 8]
+	;mov	ah, [ebp + 8]
 	fdd_exec FDD_CMD_SEEK, 0, ah
 
 	fdd_wait_ready_out
@@ -402,9 +413,14 @@ Floppy_Seek:
 	fdd_read al
 	fdd_read al
 
+	mov	ah, [ebp + 8]
+	mov	byte [.lastTrack], ah
+.exit:
+	print "  OK"
 	rpop
 	ret
 .msg db "Seeking track: %d",0xA,0
+.lastTrack db 0xff
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -417,6 +433,10 @@ Floppy_Seek:
 Floppy_Read:
 	rpush	ebp, eax, ebx, ecx, edx, esi, edi
 
+	print "Read reset:"
+	;call	Floppy_Reset
+
+	print "  Activate"
 	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA | FDD_DOR_IRQ
 	out	dx, al
@@ -440,6 +460,7 @@ Floppy_Read:
 	mov	ch, ah ; Heads
 	;mov	ch, al ; Cylinders
 
+	print "  Seek"
 	movzx	eax, al
 	push	eax
 	call	Floppy_Seek
@@ -462,6 +483,8 @@ Floppy_Read:
 	mov	ah, al
 
 	push	ax
+
+	print "  Init DMA"
 
 	;initialize_floppy_DMA:
 	; set DMA channel 2 to transfer data from 0x1000 - 0x33ff in memory
@@ -504,6 +527,9 @@ Floppy_Read:
 
 
 	;fdd_wait_ready_out
+	print "  Exec cmd"
+
+	fdd_wait_irq_begin
 	
 	mov	dx, FDD_REG_DATA_FIFO
 
@@ -526,7 +552,8 @@ Floppy_Read:
 	mov	al, cl
 	out	dx, al
 
-	fdd_wait_irq
+print "  Wait IRQ"
+	fdd_wait_irq_end
 
 	;push	.msg3
 	;call	Terminal_Print
@@ -561,7 +588,7 @@ Floppy_Read:
 	fdd_read	[.statusR]
 	fdd_read	[.statusN]
 
-
+	print "  Copying buffer"
 	; Copy tmp buffer to destination
 	mov	esi, .buffer
 	mov	edi, [ebp + 12]

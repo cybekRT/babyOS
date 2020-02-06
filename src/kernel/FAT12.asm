@@ -212,6 +212,9 @@ FAT12_ReadWholeFile:
 	call	Memory_Alloc
 	add	esp, 4
 
+	test	eax, eax
+	jz	.fail
+
 	mov	edi, eax
 	push	edi
 	movzx	eax, word [esi + FAT12_DirectoryEntry.cluster]
@@ -234,9 +237,17 @@ FAT12_ReadWholeFile:
 	jb	.readLoop
 
 ; Return
+.exit:
 	pop	eax
 	rpop
 	ret
+.fail:
+	push	.failMsg
+	call	Terminal_Print
+	add	esp, 4
+	jmp	.exit
+
+.failMsg db "No memory, file couldn't be read!",0xA,0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
