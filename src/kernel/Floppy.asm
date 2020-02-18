@@ -63,134 +63,9 @@ FDD_CMD_OPTION_MFM			equ 0x40
 FDD_CMD_OPTION_SKIP			equ 0x20
 
 timeoutMsg db "Floppy timeout...",0xA,0
-
-%macro fdd_wait_irq_begin 0
-	mov	[fdd_irq], byte 0
-%endmacro
-
-%macro fdd_wait_irq_end 0
-;mov	[fdd_irq], byte 0
-pushf
-sti
-%%wait:
-	hlt
-	test	[fdd_irq], byte 1
-	jz	%%wait
-popf
-%endmacro
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Wait for FDD to be ready for OUT command
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%macro fdd_wait_ready_out 0
-	push	eax
-	push	ecx
-	push	edx
-	mov	ecx, 1000
-%%loop:
-	mov	dx, FDD_REG_MAIN_STATUS
-	in	al, dx
-	and	al, 11000000b
-	cmp	al, 10000000b
-	jz	%%ok
-	hlt
-	loop	%%loop
-
-	push	timeoutMsg
-	call	Terminal_Print
-	add	esp, 4
-%%ok:
-	pop	edx
-	pop	ecx
-	pop	eax
-%endmacro
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Wait for FDD to be ready for IN command
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%macro fdd_wait_ready_in 0
-	push	eax
-	push	ecx
-	push	edx
-	mov	ecx, 1000
-%%loop:
-	mov	dx, FDD_REG_MAIN_STATUS
-	in	al, dx
-	and	al, 11000000b
-	cmp	al, 11000000b
-	je	%%ok
-
-	loop	%%loop
-
-	push	timeoutMsg
-	call	Terminal_Print
-	add	esp, 4
-%%ok:
-	pop	edx
-	pop	ecx
-	pop	eax
-%endmacro
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Writes one byte to FDD fifo buffer
-; Arguments:
-;	source/value of data byte
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%macro fdd_write 1
-	;fdd_wait_ready_out
-	mov	dx, FDD_REG_DATA_FIFO
-	%ifnidni %1, al
-		mov	al, %1
-	%endif
-	out	dx, al
-%endmacro
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Reads one byte from FDD fifo buffer
-; Arguments:
-;	destination of data byte
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%macro fdd_read 1
-	;fdd_wait_ready_in
-	mov	dx, FDD_REG_DATA_FIFO
-	in	al, dx
-	%ifnidni %1, al
-		mov	%1, al
-	%endif
-%endmacro
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Executes FDD command with specified parameters
-; Arguments:
-;	Command code
-;	Arguments to command
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-%macro fdd_exec 1-*
-	push	eax
-	push	edx
-
-	%rep %0
-		%if %1 = al || %1 = dl || %1 = dh
-			%error Invalid register!
-		%endif
-
-		fdd_write %1
-		%rotate 1
-	%endrep
-
-	pop	edx
-	pop	eax
-%endmacro
+fdd_irq db 0
+fdd_motor db 0
+fdd_cylinder db 0xff
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -207,11 +82,30 @@ Floppy_IRQ:
 
 	iret
 
-outo db "Port: %x, Out: %x",0xA,0
+Floppy_WaitIRQ:
+	push	ecx
+	mov	ecx, 5000
+.loop:
+	cmp	[fdd_irq], byte 1
+	je	.exit
 
-;buffer dd 0
-buffer times 512 db 0
-fdd_irq db 0
+	push	dword 1
+	call	Timer_Delay
+	add	esp, 4
+
+	dec	ecx
+	test	ecx, ecx
+	jz	.error
+
+.exit:
+	pop	ecx
+	ret
+
+.error:
+	print "FDD error...1"
+	cli
+	hlt
+	jmp	.error
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -219,11 +113,6 @@ fdd_irq db 0
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_Init:
-	;push	512 * 2880
-	;call	Memory_Alloc
-	;add	esp, 4
-	;mov	[buffer], eax
-
 	print	"FDC interrupts"
 	push	IRQ2INT(IRQ_FLOPPY)
 	push	Floppy_IRQ
@@ -239,253 +128,335 @@ print	"FDC lock"
 	call	Floppy_Lock
 	ret
 
-.status db "FDD Status: %b",0xA,0
-.version db "FDD Version: %x",0xA,0
-.lock db "FDD Lock: %x",0xA,0
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Internal
-;
-; Resets the floppy controller
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Floppy_Reset:
-print "  Reset"
-	; reset
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, !FDD_DOR_RESET | FDD_DOR_IRQ
-	out	dx, al
-
-print "  Wait"
-	; wait 10ms
-	push	dword 10
-	call	Timer_Delay
-	add	esp, 4
-
-print "  Data rate"
-	; datarate
-	mov	dx, FDD_REG_DATARATE_SELECT
-	mov	al, FDD_DSR_TYPE_144
-	out	dx, al
-
-print "  Deassert reset"
-	; un-reset
-
-	fdd_wait_irq_begin
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ
-	out	dx, al
-
-
-;	mov	ecx, 4
-;.senseIrq:
-;	fdd_exec FDD_CMD_SENSE_INTERRUPT
-;	fdd_read al
-;	fdd_read al
-;	dec	ecx
-;	jnz	.senseIrq
-
-print "  Wait IRQ"
-	fdd_wait_irq_end
-
-print "  Specify"
-	; Specify
-	fdd_exec FDD_CMD_SPECIFY, (13 << 4 | 15 << 0), (1 << 1 | 0)
-	ret
-
-motorEnabled db 0
-Floppy_EnableMotor:
-	rpush	ax, dx
-	test	[motorEnabled], byte 1
-	jnz	.enabled
-
-	mov	dx, FDD_REG_DIGITAL_OUT
-	in	al, dx
-
-	or	al, FDD_DOR_MOTA | FDD_DOR_DSELA
-	out	dx, al
-
-	push	dword 300
-	call	Timer_Delay
-	add	esp, 4
-	mov	[motorEnabled], byte 1
-
-.enabled:
-	rpop
-	ret
-
-Floppy_DisableMotor:
-	rpush	ax, dx
-	test	[motorEnabled], byte 1
-	jz	.disabled
-
-	mov	dx, FDD_REG_DIGITAL_OUT
-	in	al, dx
-
-	and	al, ~(FDD_DOR_MOTA | FDD_DOR_DSELA)
-	out	dx, al
-
-	mov	[motorEnabled], byte 0
-
-.disabled:
-	rpop
-	ret
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Internal
-;
-; Recalibrates the FDD
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Floppy_Recalibrate:
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA
-	out	dx, al
-
-	; wait for motor to start
-	push	dword 100
-	call	Timer_Delay
-	add	esp, 4
-
-	fdd_wait_ready_out
-	mov	eax, 0
-	fdd_exec FDD_CMD_RECALIBRATE, 0x00
-
-	;fdd_wait_irq
-
-	fdd_wait_ready_out
-	fdd_exec FDD_CMD_SENSE_INTERRUPT
-	fdd_read al
-	xchg	al, ah
-	fdd_read al
-
+Floppy_MotorOn:
 	push	eax
-	push	.status
-	call	Terminal_Print
-	add	esp, 8
+	push	edx
 
-	ret
-.status db "FDD Status: %x",0xA,0
+	mov	dx, 0x3f2
+	mov	al, 0x1c
+	out	dx, al
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Internal
-;
-; Locks the configuration of FDD
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Floppy_Lock:
-	fdd_exec FDD_CMD_OPTION_MULTITRACK | FDD_CMD_LOCK
-	fdd_read al
+	push	dword 200
+	call	Timer_Delay
+	add	esp, 4
+
+	mov	[fdd_motor], byte 1
+
+	pop	edx
+	pop	eax
 	ret
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Floppy - Seek track
-; Parameters:
-;	[ebp + 8] - track
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Floppy_Seek:
-	rpush	ebp, eax
+Floppy_MotorOff:
+	push	eax
+	push	edx
 
-	push	dword [ebp + 8]
-	push	.msg
-	call	Terminal_Print
-	add	esp, 8
+	mov	dx, 0x3f2
+	mov	al, 0
+	out	dx, al
 
-	mov	ah, [ebp + 8]
-	cmp	ah, [.lastTrack]
-	je	.exit
+	mov	[fdd_motor], byte 0
 
-	print "  Seek!"
-	fdd_wait_ready_out
+	pop	edx
+	pop	eax
+	ret
 
-	;mov	ah, [ebp + 8]
-	fdd_exec FDD_CMD_SEEK, 0, ah
+Floppy_SendByte:
+	push	ecx
+	push	edx
 
-	fdd_wait_ready_out
+	mov	ecx, 0xffffffff
+	push	eax
+.loop:
+	dec	ecx
+	test	ecx, ecx
+	jz	.error
 
-	;fdd_wait_irq
-	fdd_exec FDD_CMD_SENSE_INTERRUPT
-	fdd_read al
-	fdd_read al
+	mov	dx, 0x3f4
+	in	al, dx
+	and	al, 11000000b
+	cmp	al, 10000000b
+	jnz	.loop
 
-	mov	ah, [ebp + 8]
-	mov	byte [.lastTrack], ah
+	pop	eax
+	mov	dx, 0x3f5
+	out	dx, al
+
 .exit:
-	print "  OK"
-	rpop
+	pop	edx
+	pop	ecx
 	ret
-.msg db "Seeking track: %d",0xA,0
-.lastTrack db 0xff
+.error:
+	print "FDD error...2"
+	cli
+	hlt
+	jmp	.error
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
-; Floppy - Read
-; Parameters:
-;	[ebp +  8] - lba
-;	[ebp + 12] - buffer
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Floppy_Read:
-	rpush	ebp, eax, ebx, ecx, edx, esi, edi
+Floppy_ReadByte:
+	push	ecx
+	push	edx
 
-	print "Read reset:"
-	;call	Floppy_Reset
+	mov	ecx, 0xffffffff
+.loop:
+	dec	ecx
+	test	ecx, ecx
+	jz	.error
 
-	print "  Activate"
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA | FDD_DOR_IRQ
+	mov	dx, 0x3f4
+	in	al, dx
+	and	al, 11000000b
+	cmp	al, 11000000b
+	jnz	.loop
+
+	mov	dx, 0x3f5
+	in	al, dx
+
+	pop	edx
+	pop	ecx
+	ret
+
+.exit:
+	ret
+.error:
+	print "FDD error...3"
+	cli
+	hlt
+	jmp	.error
+
+Floppy_Reset:
+
+	mov	dx, 0x3f2
+	mov	al, 00001000b
 	out	dx, al
 
-	;call	Floppy_EnableMotor
-
-	;and	[ebp + 8], dword 0b1
-
-	; LBA 2 CHS
-	mov	eax, [ebp + 8]
-	mov	bl, 18 ; [sectorsPerTrack]
-	div	bl
-
-	mov	cl, ah ; Sectors
-	inc	cl
-	xor	ah, ah
-
-	mov	bl, 2 ; [headsCount]
-	div	bl
-
-	mov	ch, ah ; Heads
-	;mov	ch, al ; Cylinders
-
-	print "  Seek"
-	movzx	eax, al
-	push	eax
-	call	Floppy_Seek
+	push	dword 1000
+	call	Timer_Delay
 	add	esp, 4
 
-	; Start reading
-	;fdd_wait_ready_out
+	mov	dx, 0x3f7
+	mov	al, 00000000b
+	out	dx, al
 
-	push	dword [ebp + 12]
-	push	dword [ebp + 8]
+	mov	dx, 0x3f2
+	mov	al, 00001100b
+	out	dx, al
+
+	mov	[fdd_irq], byte 0
+	call	Floppy_WaitIRQ
+
+	mov	ecx, 4
+.status:
+	mov	al, 0x08
+	call	Floppy_SendByte
+	call	Floppy_ReadByte
+	call	Floppy_ReadByte
+	loop	.status
+
+	mov	al, 0x03
+	call	Floppy_SendByte
+	mov	al, 0xDF
+	call	Floppy_SendByte
+	mov	al, 0x02
+	call	Floppy_SendByte
+
+	ret
+
+Floppy_Seek:
+	push	ebx
+	mov	bl, al
+
+	mov	al, [fdd_cylinder]
+	cmp	bl, al
+	jz	.exit
+
+	mov	al, 0x0F
+	call	Floppy_SendByte
+	mov	al, 0x00
+	call	Floppy_SendByte
+	mov	al, bl
+	call	Floppy_SendByte
+
+	mov	[fdd_irq], byte 0
+	call	Floppy_WaitIRQ
+
+	mov	al, 0x08
+	call	Floppy_SendByte
+	call	Floppy_ReadByte
+	mov	ah, al
+	call	Floppy_ReadByte
+
+	test	ah, 00100000b
+	jz	.error
+	test	ah, 10000000b
+	jnz	.error
+
+.exit:
+	pop	ebx
+	ret
+.error:
+	print "Seek error..."
+	cli
+	hlt
+	jmp	.error
+
+Floppy_Recalibrate:
+
+	call	Floppy_MotorOn
+
+	mov	al, 0x07
+	call	Floppy_SendByte
+	mov	al, 0x00
+	call	Floppy_SendByte
+
+	mov	[fdd_irq], byte 0
+	call	Floppy_WaitIRQ
+
+	mov	al, 0x08
+	call	Floppy_SendByte
+	call	Floppy_ReadByte
+	mov	ah, al
+	call	Floppy_ReadByte
+
+	test	ah, 00100000b
+	jz	.error
+	test	ah, 00010000b
+	jnz	.error
+
+.exit:
+	mov	[fdd_cylinder], byte 0
+	ret
+
+.error:
+	print "Fdd recalibrate error..."
+	cli
+	hlt
+	jmp	.error
+
+Floppy_Lock:
+	ret
+
+fdd_buffer times 512 db 0
+
+fdd_head db 0
+fdd_driveno db 0
+fdd_errorcode db 0
+fdd_track db 0
+fdd_sector db 0
+Floppy_Read:
+	and	dh, 1
+	mov	[fdd_head], dh
+	shl	dh, 2
+	mov	[fdd_driveno], dh
+
+	mov	[fdd_errorcode], byte 0x04
+	;cmp	ch, 0x51
+	mov	[fdd_track], ch
+
+	mov	[fdd_sector], cl
+	test	[fdd_motor], byte 1
+	jnz	.l1
+	call	Floppy_MotorOn
+
+.l1:
+	mov	dx, 0x3f7
+	mov	al, 0
+	out	dx, al
+	mov	[fdd_errorcode], byte 0x80
+
+	call	Floppy_Seek
+
+.l3:
+	mov	dx, 0x3f4
+	in	al, dx
+	test	al, 00100000b
+	jnz	.error
+
+.read_fdd:
+	mov	bl, 2
+	mov	esi, 512
+	mov	ecx, 0x80000
+	mov	bh, 0
+	call	dma_transfer
+
+	mov	al, 0xe6
+	call	Floppy_SendByte
+
+.cont:
+	mov	al, [fdd_driveno]
+	call	Floppy_SendByte
+	mov	al, [fdd_track]
+	call	Floppy_SendByte
+
+	mov	al, [fdd_head]
+	call	Floppy_SendByte
+	mov	al, [fdd_sector]
+	call	Floppy_SendByte
+	mov	al, 0x02
+	call	Floppy_SendByte
+
+	mov	al, 0x12
+	call	Floppy_SendByte
+	mov	al, 0x1b
+	call	Floppy_SendByte
+	mov	al, 0xff
+	call	Floppy_SendByte
+
+	print	"== Waiting IRQ =="
+	mov	[fdd_irq], byte 0
+	call	Floppy_WaitIRQ
+	print	"   OK"
+
+	call	Floppy_ReadByte
+	mov	[res_st0], al
+	call	Floppy_ReadByte
+	mov	[res_st1], al
+	call	Floppy_ReadByte
+	mov	[res_st2], al
+	call	Floppy_ReadByte
+	mov	[res_c], al
+	call	Floppy_ReadByte
+	mov	[res_h], al
+	call	Floppy_ReadByte
+	mov	[res_r], al
+	call	Floppy_ReadByte
+	mov	[res_n], al
+
+	test	[res_st0], byte 11000000b
+	jnz	.error
+	mov	[fdd_errorcode], byte 0
+
+.exit:
+	ret
+
+.error:
+	print "Read error!"
+
+	movzx	eax, byte [res_st2]
+	push	eax
+	movzx	eax, byte [res_st1]
+	push	eax
+	movzx	eax, byte [res_st0]
+	push	eax
 	push	.msg
 	call	Terminal_Print
-	add	esp, 12
+	add	esp, 16
 
-	; head -> ch
-	; sector -> cl
-	mov	bh, ch
-	shl	ch, 2
-	or	ch, 0 ; drive number
-	mov	ah, al
+	ret
+	cli
+	hlt
+	jmp	.error
 
-	push	ax
+.msg db  "Status - st0: %x, st1: %x, st2: %x",0xA,0
 
-	print "  Init DMA"
+res_st0 db 0xff
+res_st1 db 0
+res_st2 db 0
+res_c db 0
+res_h db 0
+res_r db 0
+res_n db 0
 
+dma_transfer:
+	push	eax
 	;initialize_floppy_DMA:
 	; set DMA channel 2 to transfer data from 0x1000 - 0x33ff in memory
 	; paging must map this _physical_ memory elsewhere and _pin_ it from paging to disk!
@@ -497,7 +468,7 @@ Floppy_Read:
 	mov	al, 0xFF
 	out 0x0c, al      ; reset the master flip-flop
 
-	mov	ax, .buffer
+	mov	ax, di
 
 	;mov	al, 0
 	out 0x04, al         ; address to 0 (low byte)
@@ -521,133 +492,9 @@ Floppy_Read:
 	mov	al, 0x02
 	out 0x0a, al      ; unmask DMA channel 2
 
-	pop	ax
-
-	;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA, ch, ah, bh, cl, 2, 1, 0x1b, 0xff
-
-
-	;fdd_wait_ready_out
-	print "  Exec cmd"
-
-	fdd_wait_irq_begin
-	
-	mov	dx, FDD_REG_DATA_FIFO
-
-	mov	al, FDD_CMD_OPTION_MFM | FDD_CMD_READ_DATA
-	out	dx, al
-	mov	al, ch
-	out	dx, al
-	mov	al, ah
-	out	dx, al
-	mov	al, bh
-	out	dx, al
-	mov	al, cl
-	out	dx, al
-	mov	al, 2
-	out	dx, al
-	mov	al, 0x1B
-	out	dx, al
-	mov	al, 0x1b
-	out	dx, al
-	mov	al, cl
-	out	dx, al
-
-print "  Wait IRQ"
-	fdd_wait_irq_end
-
-	;push	.msg3
-	;call	Terminal_Print
-	;add	esp, 4
-
-
-	;;;;;;fdd_exec FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_MULTITRACK | FDD_CMD_READ_DATA, 0, 0, 0, 2, 2, 18, 0x1b, 0xff
-;jmp $
-
-;	mov	edi, [ebp + 12]
-;	mov	ecx, 512
-;.loop:
-;	fdd_read al
-;
-;	mov	[edi], al
-;	inc	edi
-
-	;movzx	ebx, al
-	;push	ebx
-	;push	.msg2
-	;call	Terminal_Print
-	;add	esp, 8
-
-;	loop	.loop
-
-	; TODO check these values
-	fdd_read	[.statusST0]
-	fdd_read	[.statusST1]
-	fdd_read	[.statusST2]
-	fdd_read	[.statusC]
-	fdd_read	[.statusH]
-	fdd_read	[.statusR]
-	fdd_read	[.statusN]
-
-	print "  Copying buffer"
-	; Copy tmp buffer to destination
-	mov	esi, .buffer
-	mov	edi, [ebp + 12]
-	mov	ecx, 512
-	rep movsb
-
-
-	;push	dword [.statusBuffer]
-	;push	dword [.statusBuffer+4]
-	;push	.statusMsg
-	;call	Terminal_Print
-	;add	esp, 12
-
-	xor	eax, eax
-	mov	al, [.statusST0]
-	push	eax
-	mov	al, [.statusST1]
-	push	eax
-	mov	al, [.statusST2]
-	push	eax
-
-	push	.statusMsg2
-	;call	Terminal_Print
-	add	esp, 16
-
-	;test	  [.statusST0], byte 11000000b	      ; test sr0 is 0xC0
-	;jnz	  .error
-
-	;push	dword 100
-	;call	Timer_Delay
-	;add	esp, 4
-
-	rpop
+	pop	eax
 	ret
-.error:
-	push	.errorMsg
-	call	Terminal_Print
-	jmp	$
 
-.msg db "Reading sector %u at %p",0xA,0
-.msg2 db "%c",0
-.msg3 db "Reading OK",0xA,0
-.statusBuffer times 8 db 0
-.statusMsg db 0xA,"Status: %P %P",0xA,0
-.errorMsg db "Floppy failed!",0
-
-db "================"
-align 32
-.buffer times 512 db 0
-db "================"
-times 8192 db 0 ; TODO remove me, but after clearing this file and making sure floppy is working great
-
-db "=== END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER END OF BUFFER ==="
-
-.statusST0 db 0
-.statusST1 db 0
-.statusST2 db 0
-.statusC db 0
-.statusH db 0
-.statusR db 0
-.statusN db 0
-.statusMsg2 db 0xA,"Status: %b %b %b",0xA,0
+.status db "FDD Status: %b",0xA,0
+.version db "FDD Version: %x",0xA,0
+.lock db "FDD Lock: %x",0xA,0

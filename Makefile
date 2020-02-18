@@ -2,7 +2,7 @@ SHELL		= bash
 NASM		= nasm
 BOCHS		= bochs
 PHP		= php
-CFS		= ../cFS/cFS-cli/Debug/cFS-cli
+CFS		= ../cFS/cFS-cli/cFS-cli
 
 ifeq ($(OS),Windows_NT)
 	QEMU		= D:\Programs\Qemu\qemu-system-i386
