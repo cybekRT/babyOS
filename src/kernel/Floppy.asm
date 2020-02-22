@@ -260,13 +260,18 @@ Floppy_Reset:
 
 	ret
 
+fdd_cylinder_prev db 0
 Floppy_Seek:
 	push	ebx
-	mov	bl, al
+	mov	bl, [fdd_track]
 
-	mov	al, [fdd_cylinder]
+	mov	al, [fdd_cylinder_prev]
 	cmp	bl, al
 	jz	.exit
+
+	mov	[fdd_cylinder_prev], bl
+
+	print	"Seeking track!"
 
 	mov	al, 0x0F
 	call	Floppy_SendByte
@@ -288,6 +293,8 @@ Floppy_Seek:
 	jz	.error
 	test	ah, 10000000b
 	jnz	.error
+
+	print	"Seek ok!"
 
 .exit:
 	pop	ebx
@@ -322,7 +329,7 @@ Floppy_Recalibrate:
 	jnz	.error
 
 .exit:
-	mov	[fdd_cylinder], byte 0
+	mov	[fdd_track], byte 0
 	ret
 
 .error:
@@ -334,24 +341,119 @@ Floppy_Recalibrate:
 Floppy_Lock:
 	ret
 
+align 32
+db "================"
 fdd_buffer times 512 db 0
+db "================"
+
+Floppy_Read:
+	rpush	ebp, eax, ebx, ecx, edx, esi, edi
+
+	;call	Floppy_Init
+
+	;print "Read reset:"
+	;call	Floppy_Reset
+
+	;print "  Activate"
+	;mov	dx, FDD_REG_DIGITAL_OUT
+	;mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA | FDD_DOR_IRQ
+	;out	dx, al
+
+	;call	Floppy_EnableMotor
+
+	;and	[ebp + 8], dword 0b1
+
+	; LBA 2 CHS
+	mov	eax, [ebp + 8]
+	mov	bl, 18 ; [sectorsPerTrack]
+	div	bl
+
+	mov	cl, ah ; Sectors
+	inc	cl
+	xor	ah, ah
+
+	mov	bl, 2 ; [headsCount]
+	div	bl
+
+	mov	ch, ah ; Heads
+	;mov	ch, al ; Cylinders
+
+	;print "  Seek"
+	;movzx	eax, al
+	;push	eax
+	;call	Floppy_Seek
+	;add	esp, 4
+
+	; Start reading
+	;fdd_wait_ready_out
+
+	;push	dword [ebp + 12]
+	;push	dword [ebp + 8]
+	;push	.msg
+	;call	Terminal_Print
+	;add	esp, 12
+
+	; head -> ch
+	; sector -> cl
+	mov	bh, ch
+	shl	ch, 2
+	or	ch, 0 ; drive number
+	mov	ah, al
+
+	;mov	[fdd_head], ch
+	mov	[fdd_driveno], bh
+	shl	byte [fdd_driveno], 2
+
+	mov	[fdd_head], bh
+	mov	[fdd_sector], cl
+	mov	[fdd_track], ah
+
+	push	dword [ebp + 8]
+	push	.msg
+	call	Terminal_Print
+	add	esp, 8
+
+	movzx	eax, byte [fdd_sector]
+	push	eax
+	movzx	eax, byte [fdd_head]
+	push	eax
+	movzx	eax, byte [fdd_track]
+	push	eax
+	push	.msg2
+	call	Terminal_Print
+	add	esp, 16
+
+	print	"Reading floppy"
+	call	Floppy_Read2
+
+	print	"Copying buffer..."
+	mov	esi, fdd_buffer
+	mov	edi, [ebp + 12]
+	mov	ecx, 512
+	rep	movsb
+	print	"Done!"
+
+	rpop
+	ret
+.msg db "Reading LBA: %u",0xA,0
+.msg2 db "Cylinder: %u, Head: %u, Sector: %u",0xA,0
 
 fdd_head db 0
 fdd_driveno db 0
 fdd_errorcode db 0
 fdd_track db 0
 fdd_sector db 0
-Floppy_Read:
+Floppy_Read2:
 	and	dh, 1
-	mov	[fdd_head], dh
+	;mov	[fdd_head], dh
 	shl	dh, 2
-	mov	[fdd_driveno], dh
+	;mov	[fdd_driveno], dh
 
 	mov	[fdd_errorcode], byte 0x04
 	;cmp	ch, 0x51
-	mov	[fdd_track], ch
+	;mov	[fdd_track], ch
 
-	mov	[fdd_sector], cl
+	;mov	[fdd_sector], cl
 	test	[fdd_motor], byte 1
 	jnz	.l1
 	call	Floppy_MotorOn
@@ -440,7 +542,7 @@ Floppy_Read:
 	call	Terminal_Print
 	add	esp, 16
 
-	ret
+	;ret
 	cli
 	hlt
 	jmp	.error
@@ -468,7 +570,8 @@ dma_transfer:
 	mov	al, 0xFF
 	out 0x0c, al      ; reset the master flip-flop
 
-	mov	ax, di
+	;mov	ax, di
+	mov	ax, fdd_buffer
 
 	;mov	al, 0
 	out 0x04, al         ; address to 0 (low byte)

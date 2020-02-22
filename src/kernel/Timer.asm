@@ -90,7 +90,7 @@ ISR_PIT:
 	;mov	dword [omg], 0
 	popf
 	;iret
-	;call	Process_Scheduler
+	call	Process_Scheduler
 
 x:
 	;mov	al, 0x20
