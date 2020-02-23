@@ -144,9 +144,12 @@ Init32:
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
+	call	FAT12_ReadDirectory
 ;xchg bx, bx
 	call	FAT12_ReadWholeFile
+
+	call	eax
+
 ;xchg bx, bx
 	;mov	edi, [fatEntry]
 	;mov	byte [edi + FAT12_DirectoryEntry.attributes], 0

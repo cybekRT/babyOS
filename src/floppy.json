@@ -6,7 +6,8 @@
                 "Test1": "lst/boot.lst",
                 "Test2": "lst/boot.lst",
                 "TestWithLongFilename.ext": "lst/boot.lst",
-                "YoLo.bin": "lst/boot.lst"
+                "YoLo.bin": "lst/boot.lst",
+                "test.com": "out/test.com"
 	},
         "output": "out/floppy.img"
 }

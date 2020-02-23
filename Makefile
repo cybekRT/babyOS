@@ -57,7 +57,12 @@ out/kernel.bin: src/kernel/*.asm src/kernel/*.inc $(SRC_DIR)/*.inc #src/kernel/i
 # Interrupts
 INT_FILES = ${wildcard ${SRC_DIR}/kernel/int/*.asm} ${wildcard ${SRC_DIR}/kernel/int/*.c}
 
-int: 
+COM_FILES = ${wildcard ${SRC_DIR}/kernel/com/*.asm}
+COM_FILES_OUT = ${addsuffix .com,${addprefix out/,${basename ${notdir $(COM_FILES)}}}}
+
+SRC_EXT = $(INT_FILES) $(COM_FILES_OUT)
+
+int: $(SRC_EXT)
 #dirs src/kernel/interrupt_codes.inc ${addprefix out/, ${addsuffix .int, ${notdir ${basename ${INT_FILES}}}}}
 
 src/kernel/interrupt_codes.inc: 
@@ -67,6 +72,9 @@ src/kernel/interrupt_codes.inc:
 out/%.int: 
 #src/kernel/int/%.asm src/kernel/*.inc
 #	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
+
+out/%.com: src/kernel/com/%.asm
+	nasm $< -o $@
 
 out/%.int: 
 #src/kernel/int/%.c src/kernel/*.inc Makefile
