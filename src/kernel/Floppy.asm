@@ -82,7 +82,25 @@ Floppy_IRQ:
 
 	iret
 
+%macro fdd_wait_irq_begin 0
+	mov	[fdd_irq], byte 0
+%endmacro
+
+%macro fdd_wait_irq_end 0
+	mov	[fdd_irq], byte 0
+	;pushf
+	;sti
+%%wait:
+	hlt
+	cmp	[fdd_irq], byte 1
+	jz	%%wait
+	;popf
+%endmacro
+
 Floppy_WaitIRQ:
+	fdd_wait_irq_end
+	ret
+
 	push	ecx
 	mov	ecx, 5000
 .loop:
@@ -120,11 +138,11 @@ Floppy_Init:
 	add	esp, 8
 	sti
 
-print	"FDC reset"
+	print	"FDC reset"
 	call	Floppy_Reset
-print	"FDC recalibrate"
+	print	"FDC recalibrate"
 	call	Floppy_Recalibrate
-print	"FDC lock"
+	print	"FDC lock"
 	call	Floppy_Lock
 	ret
 
@@ -160,67 +178,101 @@ Floppy_MotorOff:
 	pop	eax
 	ret
 
-Floppy_SendByte:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Wait for FDD to be ready for OUT command
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_wait_ready_out 0
+	push	eax
 	push	ecx
 	push	edx
-
-	mov	ecx, 0xffffffff
-	push	eax
-.loop:
-	dec	ecx
-	test	ecx, ecx
-	jz	.error
-
-	mov	dx, 0x3f4
+	mov	ecx, 1000
+%%loop:
+	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
 	and	al, 11000000b
 	cmp	al, 10000000b
-	jnz	.loop
+	jz	%%ok
+	hlt
+	loop	%%loop
 
-	pop	eax
-	mov	dx, 0x3f5
-	out	dx, al
-
-.exit:
+	push	timeoutMsg
+	call	Terminal_Print
+	add	esp, 4
+%%ok:
 	pop	edx
 	pop	ecx
-	ret
-.error:
-	print "FDD error...2"
-	cli
-	hlt
-	jmp	.error
+	pop	eax
+%endmacro
 
-Floppy_ReadByte:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Wait for FDD to be ready for IN command
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_wait_ready_in 0
+	push	eax
 	push	ecx
 	push	edx
-
-	mov	ecx, 0xffffffff
-.loop:
-	dec	ecx
-	test	ecx, ecx
-	jz	.error
-
-	mov	dx, 0x3f4
+	mov	ecx, 1000
+%%loop:
+	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
 	and	al, 11000000b
 	cmp	al, 11000000b
-	jnz	.loop
+	je	%%ok
 
-	mov	dx, 0x3f5
-	in	al, dx
+	loop	%%loop
 
+	push	timeoutMsg
+	call	Terminal_Print
+	add	esp, 4
+%%ok:
 	pop	edx
 	pop	ecx
+	pop	eax
+%endmacro
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Writes one byte to FDD fifo buffer
+; Arguments:
+;	source/value of data byte
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_write 1
+	fdd_wait_ready_out
+	mov	dx, FDD_REG_DATA_FIFO
+	%ifnidni %1, al
+		mov	al, %1
+	%endif
+	out	dx, al
+%endmacro
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Reads one byte from FDD fifo buffer
+; Arguments:
+;	destination of data byte
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_read 1
+	fdd_wait_ready_in
+	mov	dx, FDD_REG_DATA_FIFO
+	in	al, dx
+	%ifnidni %1, al
+		mov	%1, al
+	%endif
+%endmacro
+
+Floppy_SendByte:
+	fdd_write al
 	ret
 
-.exit:
+Floppy_ReadByte:
+	fdd_read al
 	ret
-.error:
-	print "FDD error...3"
-	cli
-	hlt
-	jmp	.error
 
 Floppy_Reset:
 

@@ -15,7 +15,7 @@ else
 	DOS_IMG		= ~/dos.img
 	QEMU		= qemu-system-i386
 #	PCEM		= wine ~/Downloads/PCem/PCem.exe
-	PCEM		= wine ~/Seafile/Programs/PCem/PCem.exe
+	PCEM		= wine64 ~/Seafile/Programs/PCem/PCem.exe
 	PHP		= php
 	WATCOM		= D:/Programs/Watcom
 	BOCHS		= bochs -f bochs.cfg
