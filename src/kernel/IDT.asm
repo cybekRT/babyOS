@@ -132,10 +132,8 @@ IDT_RegisterISR:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ISR_GeneralProtectionFault:
 	rpush	ebp, eax, ecx, esi, edi
-	;xchg	bx, bx
-	;jmp	Panic
 
-	;call	Terminal_Init
+	call	Terminal_Init
 
 	push	.msg
 	call	Terminal_Print
@@ -143,7 +141,6 @@ ISR_GeneralProtectionFault:
 
 	; Selector index
 	mov	eax, [ebp + 4]
-	;jmp $
 	shr	eax, 3
 	push	eax
 
@@ -162,38 +159,9 @@ ISR_GeneralProtectionFault:
 	call	Terminal_Print
 	add	esp, 16
 
-	;jmp $
-
-	mov	al, 12
-	; top
-	mov	edi, 0xa0000
-	mov	ecx, 320
-	rep	stosb
-	; bottom
-	mov	edi, 0xa0000 + 199*320
-	mov	ecx, 320
-	rep	stosb
-	; left
-	mov	edi, 0xa0000
-	mov	ecx, 200
-.left_loop:
-	mov	[edi], al
-	add	edi, 320
-	loop	.left_loop
-	; right
-	mov	edi, 0xa0000 + 319
-	mov	ecx, 200
-.right_loop:
-	mov	[edi], al
-	add	edi, 320
-	loop	.right_loop
-
 	rpop
 	add	esp, 4 ; remove error code from stack
 	jmp	Panic
 
-	cli
-	hlt
-	jmp	$-1
 .msg db 0xA,"General protection fault!",0xA,0
-.msgCode db "  Ext: %b, Type: %b, Index: %u",0xA,0
+.msgCode db "Ext: %b, Type: %b, Index: %u",0xA,0xA,0

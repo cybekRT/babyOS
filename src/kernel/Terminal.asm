@@ -11,6 +11,11 @@ backgroundColor db 0x18
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Terminal_Init:
+	rpush	eax, ecx, edi
+
+	mov	word [cursorX], 0
+	mov	word [cursorY], 0
+
 	mov	al, [backgroundColor]
 	mov	ecx, 320*200
 	mov	edi, 0xa0000
@@ -20,16 +25,17 @@ Terminal_Init:
 	call	Terminal_Print
 	add	esp, 4
 
-	push	dword 0xbaadf00d
-	push	dword 0xabcdef12
-	push	dword 0x4321
-	push	dword 2109
-	push	dword -2109
-	push	dword -2109
-	push	.testMsg
-	call	Terminal_Print
-	add	esp, 28
+	;push	dword 0xbaadf00d
+	;push	dword 0xabcdef12
+	;push	dword 0x4321
+	;push	dword 2109
+	;push	dword -2109
+	;push	dword -2109
+	;push	.testMsg
+	;call	Terminal_Print
+	;add	esp, 28
 
+	rpop
 	ret
 .helloMsg db OS_NAME,0xA,0xA,0
 .testMsg db "Test: %d, %u, %u, %x, %x, %p",0xA,0

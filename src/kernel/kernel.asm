@@ -77,8 +77,6 @@ Init32:
 	add	eax, 8192
 	mov	esp, eax
 
-	;xchg bx, bx
-
 	; Initialize rest of kernel services
 	print	"Init scheduler"
 	call	Process_Init
@@ -89,114 +87,27 @@ Init32:
 	call	Floppy_Init
 	print	"Floppy inited!"
 
-;	push	fdd_buffer
-;	push	0
-;.loopxx:
-;	call	Floppy_Read
-;	inc	dword [esp]
-;	jmp	.loopxx
-
-;	mov	ecx, 20
-;	push	dword yoloBuffer
-;	push	0
-;.tmpLoop:
-;
-;	push	dword	1000
-;	;call	Timer_Delay
-;	add	esp, 4
-;
-;	call	Floppy_Read
-;	add	[esp + 0], dword 1
-;	add	[esp + 4], dword 512
-;	loop	.tmpLoop
-;
-;	pop	ecx
-;	pop	eax
-;	hlt
-;	cli
-;	jmp $
-
-;xchg bx, bx
 	call	FAT12_Init
-
-;xchg bx, bx
 	call	FAT12_OpenRoot
-;	mov	ecx, 10
-;.fatLoop:
-;	call	FAT12_ReadDirectory
-;
-;	mov	edi, [fatEntry]
-;	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
-;	push	dword [fatEntry]
-;	push	dword .zz
-;	call	Terminal_Print
-;	add	esp, 8
-;
-;	loop	.fatLoop
-
-;xchg bx, bx
 
 	call	FAT12_ReadDirectory
-;xchg bx, bx
-	call	FAT12_ReadDirectory
-;xchg bx, bx
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadDirectory
-;xchg bx, bx
+	call	FAT12_ReadDirectory
 	call	FAT12_ReadWholeFile
 
-	call	eax
+	;call	eax
+	;push	eax
+	;call	Process_Spawn
+	;add	esp, 4
 
-;xchg bx, bx
-	;mov	edi, [fatEntry]
-	;mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
-	;push	dword [fatEntry]
-	;push	dword .zz
-	;call	Terminal_Print
-	;add	esp, 8
-;call Memory_PrintInfo
-;jmp $
-;cli
-;hlt
-;jmp $
 	push	eax
 	call	Terminal_Print
 	add	esp, 4
-	;jmp $
-
-;	mov	edi, [fatEntry]
-;	mov	byte [edi + FAT12_DirectoryEntry.attributes], 0
-;	push	dword [fatEntry]
-;	push	dword .zz
-;	call	Terminal_Print
-;	add	esp, 8
-;	cli
-;	hlt
-;	jmp	$
-;
-.zz db "File: '%s'",0xA,0
-;.xx db "YoLo",0
-
-	push	tmpBuffer
-	push	dword 0
-	mov	ebp, esp
-.x:
-	call	Floppy_Read
-	;add	esp, 8
-
-	inc	dword [ebp]
-	;jmp	.x
-	;call	Floppy_Read
-	;call	Floppy_Read
-
-	;jmp $
-
-	;cli
-	;hlt
-
+sti
 	; ; Alloc
 	; push	2048
 	; call	Memory_Alloc
@@ -225,16 +136,21 @@ Init32:
 	;call	Terminal_Print
 	;add	esp, 4
 
+	sti
 	; Spawn some processes...
+	print	"Start A"
 	push	dword PidA
+	xchg	bx, bx
 	call	Process_Spawn
 	add	esp, 4
 
+	print	"Start B"
 	push	PidB
 	call	Process_Spawn
 	add	esp, 4
 
 	;xchg bx, bx
+	print	"Started inactivity loop..."
 	sti
 .xxx:
 	push	dword [tmp_value2]
@@ -269,7 +185,7 @@ tmp_value2 dd 0
 PidA:
 	;sti
 	push	1000
-	call	Timer_Delay
+	;call	Timer_Delay
 	add	esp, 4
 
 	inc	dword [tmp_value1]
@@ -278,7 +194,7 @@ PidA:
 PidB:
 	;sti
 	push	3000
-	call	Timer_Delay
+	;call	Timer_Delay
 	add	esp, 4
 
 	inc	dword [tmp_value2]
