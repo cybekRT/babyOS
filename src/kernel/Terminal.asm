@@ -222,7 +222,6 @@ Terminal_Print:
 
 	mov	esi, [ebp + 8]
 	mov	edi, 12
-	;xchg	bx, bx
 .loop:
 	movzx	eax, byte [esi]
 
@@ -302,7 +301,6 @@ Terminal_Print:
 
 .special_p:
 	mov	eax, [ebp + edi]
-	;xchg	bx, bx
 
 	push	dword '0'
 	call	Terminal_Put
@@ -328,12 +326,10 @@ Terminal_Print:
 
 .special_u:
 	mov	eax, [ebp + edi]
-	;xchg	bx, bx
 	jmp	.special_d_no_minus
 
 .special_d:
 	mov	eax, [ebp + edi]
-	;xchg	bx, bx
 
 	cmp	eax, 0
 	jge	.special_d_no_minus

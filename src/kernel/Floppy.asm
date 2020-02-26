@@ -87,13 +87,13 @@ Floppy_IRQ:
 %endmacro
 
 %macro fdd_wait_irq_end 0
-	mov	[fdd_irq], byte 0
+	;mov	[fdd_irq], byte 0
 	;pushf
 	;sti
 %%wait:
-	hlt
+	;hlt
 	cmp	[fdd_irq], byte 1
-	jz	%%wait
+	jne	%%wait
 	;popf
 %endmacro
 
@@ -154,7 +154,7 @@ Floppy_MotorOn:
 	mov	al, 0x1c
 	out	dx, al
 
-	push	dword 200
+	push	dword 500
 	call	Timer_Delay
 	add	esp, 4
 
@@ -187,7 +187,7 @@ Floppy_MotorOff:
 	push	eax
 	push	ecx
 	push	edx
-	mov	ecx, 1000
+	mov	ecx, 10000000
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
@@ -215,7 +215,7 @@ Floppy_MotorOff:
 	push	eax
 	push	ecx
 	push	edx
-	mov	ecx, 1000
+	mov	ecx, 10000000
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
@@ -275,6 +275,7 @@ Floppy_ReadByte:
 	ret
 
 Floppy_Reset:
+	print "Reset FDC"
 
 	mov	dx, 0x3f2
 	mov	al, 00001000b
@@ -284,16 +285,28 @@ Floppy_Reset:
 	call	Timer_Delay
 	add	esp, 4
 
+	print "Un-reset FDC"
+
 	mov	dx, 0x3f7
 	mov	al, 00000000b
 	out	dx, al
+
+
+	push	dword 1000
+	call	Timer_Delay
+	add	esp, 4
+
+	print "Wait FDC IRQ"
+	fdd_wait_irq_begin
 
 	mov	dx, 0x3f2
 	mov	al, 00001100b
 	out	dx, al
 
-	mov	[fdd_irq], byte 0
+	;mov	[fdd_irq], byte 0
 	call	Floppy_WaitIRQ
+
+	print "Sensing..."
 
 	mov	ecx, 4
 .status:
@@ -310,11 +323,13 @@ Floppy_Reset:
 	mov	al, 0x02
 	call	Floppy_SendByte
 
+	print "OK"
 	ret
 
 fdd_cylinder_prev db 0
 Floppy_Seek:
 	push	ebx
+.retry:
 	mov	bl, [fdd_track]
 
 	mov	al, [fdd_cylinder_prev]
@@ -324,6 +339,7 @@ Floppy_Seek:
 	mov	[fdd_cylinder_prev], bl
 
 	print	"Seeking track!"
+	fdd_wait_irq_begin
 
 	mov	al, 0x0F
 	call	Floppy_SendByte
@@ -332,7 +348,8 @@ Floppy_Seek:
 	mov	al, bl
 	call	Floppy_SendByte
 
-	mov	[fdd_irq], byte 0
+	;mov	[fdd_irq], byte 0
+	;print "Wait IRQ"
 	call	Floppy_WaitIRQ
 
 	mov	al, 0x08
@@ -353,6 +370,11 @@ Floppy_Seek:
 	ret
 .error:
 	print "Seek error..."
+
+	call	Floppy_Init
+	jmp	.retry
+
+	;jmp ehWtf
 	cli
 	hlt
 	jmp	.error
@@ -360,13 +382,14 @@ Floppy_Seek:
 Floppy_Recalibrate:
 
 	call	Floppy_MotorOn
+	fdd_wait_irq_begin
 
 	mov	al, 0x07
 	call	Floppy_SendByte
 	mov	al, 0x00
 	call	Floppy_SendByte
 
-	mov	[fdd_irq], byte 0
+	;mov	[fdd_irq], byte 0
 	call	Floppy_WaitIRQ
 
 	mov	al, 0x08
@@ -531,6 +554,8 @@ Floppy_Read2:
 	mov	bh, 0
 	call	dma_transfer
 
+	fdd_wait_irq_begin
+
 	mov	al, 0xe6
 	call	Floppy_SendByte
 
@@ -555,7 +580,7 @@ Floppy_Read2:
 	call	Floppy_SendByte
 
 	print	"== Waiting IRQ =="
-	mov	[fdd_irq], byte 0
+	;mov	[fdd_irq], byte 0
 	call	Floppy_WaitIRQ
 	print	"   OK"
 

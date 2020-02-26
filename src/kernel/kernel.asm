@@ -99,48 +99,19 @@ Init32:
 	call	FAT12_ReadDirectory
 	call	FAT12_ReadWholeFile
 
-	;call	eax
-	;push	eax
-	;call	Process_Spawn
-	;add	esp, 4
+	call	Floppy_MotorOff
+
+	push	eax
+	call	Process_Spawn
+	add	esp, 4
 
 	push	eax
 	call	Terminal_Print
 	add	esp, 4
-sti
-	; ; Alloc
-	; push	2048
-	; call	Memory_Alloc
-	; add	esp, 4
-	; call	Memory_PrintInfo
 
-	; ; Alloc
-	; push	1024
-	; call	Memory_Alloc
-	; add	esp, 4
-	; call	Memory_PrintInfo
-
-	; ; Free
-	; push	32+8
-	; call	Memory_Free
-	; add	esp, 4
-	; call	Memory_PrintInfo
-
-	; ; Free
-	; push	32+8+2048+8
-	; call	Memory_Free
-	; add	esp, 4
-	; call	Memory_PrintInfo
-
-	;push	.yolo
-	;call	Terminal_Print
-	;add	esp, 4
-
-	sti
 	; Spawn some processes...
 	print	"Start A"
 	push	dword PidA
-	xchg	bx, bx
 	call	Process_Spawn
 	add	esp, 4
 
@@ -149,7 +120,6 @@ sti
 	call	Process_Spawn
 	add	esp, 4
 
-	;xchg bx, bx
 	print	"Started inactivity loop..."
 	sti
 .xxx:
@@ -160,9 +130,8 @@ sti
 	call	Terminal_Print
 	add	esp, 16
 
-	;xchg bx, bx
 	push	dword 1000
-	;call	Timer_Delay
+	call	Timer_Delay
 	add	esp, 4
 
 	inc	dword [tmp_value]
@@ -177,24 +146,21 @@ sti
 	jmp	$-1
 .end_of_kernel db 0xA,"Kernel halted... :(",0
 .tmp db "Value: (%p) %u - %u",0xD,0
-.yolo db 0xA,"====================",0xA,"=       SPAWN      =",0xA,"====================",0xA,0xA,0
 tmp_value dd 0
 tmp_value1 dd 0
 tmp_value2 dd 0
 
 PidA:
-	;sti
 	push	1000
-	;call	Timer_Delay
+	call	Timer_Delay
 	add	esp, 4
 
 	inc	dword [tmp_value1]
 	jmp	PidA
 
 PidB:
-	;sti
 	push	3000
-	;call	Timer_Delay
+	call	Timer_Delay
 	add	esp, 4
 
 	inc	dword [tmp_value2]
@@ -203,9 +169,6 @@ PidB:
 Panic:
 	pushf
 	push	dword [esp + 4] ; eip
-
-	;mov	eax, [esp + 4]
-	;xchg	bx, bx
 
 	push	esp
 	push	ebp
@@ -287,9 +250,6 @@ times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 %include "FAT12.asm"
 
 align 32
-
-;yoloBuffer times 512*20 db 0
-;yoloBuffer db 0
 
 KERNEL_END equ $-$$ + 0x500 ;+ (512 * 20)
 

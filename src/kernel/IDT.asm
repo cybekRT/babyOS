@@ -90,9 +90,9 @@ ISR_DUMMY:
 
 ISR_DUMMY2:
 	cli
-	xchg bx, bx
+	xchg	bx, bx
 	hlt
-	jmp ISR_DUMMY2
+	jmp	ISR_DUMMY2
 
 	iret
 
@@ -107,7 +107,6 @@ ISR_DUMMY2:
 IDT_RegisterISR:
 	rpush	ebp, eax, ebx, edx
 
-	;xchg	bx, bx
 	mov	eax, [ebp + 12]
 	mov	ebx, IDT_size
 	mul	ebx

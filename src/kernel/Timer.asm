@@ -65,39 +65,20 @@ Timer_Delay:
 
 omg dd 0
 ISR_PIT:
-	;xchg bx, bx
-	;jmp $
-
 	pushf
 
 	add	dword [_ticks + 0], 1
 	adc	dword [_ticks + 4], 0
-
-	;push	eax
-	;mov	eax, [_ticks]
-	;mov	[tmp_value], eax
-
-	;pop	eax
 
 	push	eax
 	mov	al, 0x20
 	out	0x20, al
 	pop	eax
 
-	;inc	dword [omg]
-	;cmp	dword [omg], 200
-	;jne	x
-	;mov	dword [omg], 0
 	popf
-	;iret
 	call	Process_Scheduler
 
-x:
-	;mov	al, 0x20
-	;out	0x20, al
-	iret
-
 	; this should never return...
-	xchg bx, bx
-	jmp $
+	xchg	bx, bx
+	jmp	$
 	iret

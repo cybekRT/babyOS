@@ -37,12 +37,10 @@ Memory_PreInit:
 	mov	es, di
 	mov	di, MEM_MAP
 .loop:
-	;xchg	bx, bx
 	mov	ecx, 24
 	mov	eax, 0xe820
 	int	0x15
 
-	;xchg	bx, bx
 	jc	.legacy
 	test	ebx, ebx
 	jz	.exit
@@ -171,7 +169,6 @@ Memory_InitA20:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Memory_InitSort:
-	;xchg	bx, bx
 	rpush	eax, ecx, esi, edi
 .start:
 	mov	ecx, 0
@@ -269,7 +266,6 @@ Memory_InitInternal:
 	sub	eax, MEM_Handle_t_size
 
 	add	[MEM_Total], eax
-	;xchg	bx, bx
 	mov	[edi + MEM_Handle_t.length], eax
 	mov	dword [edi + MEM_Handle_t.next], 0
 
@@ -435,7 +431,6 @@ Memory_Free:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Memory_Merge:
 	rpush	eax, esi, edi
-	;xchg	bx, bx
 
 	mov	esi, [MEM_Handle]
 .loop:
@@ -446,7 +441,7 @@ Memory_Merge:
 	add	eax, [esi + MEM_Handle_t.length]
 	add	eax, MEM_Handle_t_size
 	mov	edi, [esi + MEM_Handle_t.next]
-	;xchg bx, bx
+
 	cmp	eax, edi
 	jne	.next
 
@@ -473,7 +468,6 @@ Memory_Merge:
 Memory_PrintInfo:
 	rpush	eax, ecx
 
-	;xchg	bx, bx
 	mov	ecx, 0
 	mov	eax, [MEM_Handle]
 .loop:

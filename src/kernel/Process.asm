@@ -24,7 +24,6 @@ endstruc
 
 processes_size dd 0
 processes_list dd 0
-;current_process_pid dd 0
 current_process dd 0
 process_last_pid dd 0
 
@@ -53,8 +52,6 @@ Process_Init:
 	call	Memory_Alloc
 	add	esp, 4
 
-	;xchg bx, bx
-	;mov	eax, stackBegin
 	mov	[ebx + Process_t.stack], eax
 	add	eax, STACK_SIZE
 	mov	esp, eax
@@ -66,10 +63,7 @@ Process_Init:
 
 Process_Scheduler:
 	cli
-
-	;xchg bx, bx
 	add	esp, 4
-	;iret
 
 	; Save context
 	push	eax
@@ -104,19 +98,15 @@ Process_Scheduler:
 	mov	ebp, [eax + Process_t.ebp]
 	mov	esp, [eax + Process_t.esp]
 
-	push	dword [eax + Process_t.eflags]
 	push	dword [eax + Process_t.cs]
 	push	dword [eax + Process_t.eip]
+	push	dword [eax + Process_t.eflags]
 
 	mov	eax, [eax + Process_t.eax]
 
-	;push	eax
-	;mov	eax, []
-
+	popf
 	sti
-	;mov	al, 0x20
-	;out	0x20, al
-	iret
+	retf
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -126,9 +116,9 @@ Process_Scheduler:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Process_Spawn:
+	cli
 	rpush	ebp, eax, edi
 	pushf
-	cli
 
 	;push	.preMsg
 	;call	Terminal_Print
@@ -142,7 +132,6 @@ Process_Spawn:
 	jmp	.find_last_entry
 
 .found_last_entry:
-	;xchg	bx, bx
 	push	dword ProcessEntry_t_size
 	call	Memory_Alloc
 	add	esp, 4
@@ -156,6 +145,10 @@ Process_Spawn:
 	push	edi
 	rep	stosb
 	pop	edi
+
+	;pushf
+	;pop	dword [edi + Process_t.eflags]
+	;mov	dword [edi + Process_t.eflags], 0
 
 	push	dword STACK_SIZE
 	call	Memory_Alloc
@@ -181,6 +174,7 @@ Process_Spawn:
 .exit:
 	popf
 	rpop
+	sti
 	ret
 .preMsg db "Spawning process...",0xA,0
 .msg db "Spawned process (%u) -> %p",0xA,0
