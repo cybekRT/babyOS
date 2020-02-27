@@ -105,10 +105,6 @@ Init32:
 	call	Process_Spawn
 	add	esp, 4
 
-	push	eax
-	call	Terminal_Print
-	add	esp, 4
-
 	; Spawn some processes...
 	print	"Start A"
 	push	dword PidA
