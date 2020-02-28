@@ -70,10 +70,10 @@ ISR_PIT:
 	add	dword [_ticks + 0], 1
 	adc	dword [_ticks + 4], 0
 
-	push	eax
+	push	ax
 	mov	al, 0x20
 	out	0x20, al
-	pop	eax
+	pop	ax
 
 	popf
 	call	Process_Scheduler

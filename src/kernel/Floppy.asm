@@ -73,7 +73,7 @@ fdd_cylinder db 0xff
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Floppy_IRQ:
-	or	[fdd_irq], byte 1
+	or	byte [fdd_irq], 1
 
 	push	ax
 	mov	al, 0x20
@@ -83,47 +83,14 @@ Floppy_IRQ:
 	iret
 
 %macro fdd_wait_irq_begin 0
-	mov	[fdd_irq], byte 0
+	mov	byte [fdd_irq], 0
 %endmacro
 
 %macro fdd_wait_irq_end 0
-	;mov	[fdd_irq], byte 0
-	;pushf
-	;sti
 %%wait:
-	;hlt
-	cmp	[fdd_irq], byte 1
-	jne	%%wait
-	;popf
+	test	byte [fdd_irq], 1
+	jz	%%wait
 %endmacro
-
-Floppy_WaitIRQ:
-	fdd_wait_irq_end
-	ret
-
-	push	ecx
-	mov	ecx, 5000
-.loop:
-	cmp	[fdd_irq], byte 1
-	je	.exit
-
-	push	dword 1
-	call	Timer_Delay
-	add	esp, 4
-
-	dec	ecx
-	test	ecx, ecx
-	jz	.error
-
-.exit:
-	pop	ecx
-	ret
-
-.error:
-	print "FDD error...1"
-	cli
-	hlt
-	jmp	.error
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -303,8 +270,7 @@ Floppy_Reset:
 	mov	al, 00001100b
 	out	dx, al
 
-	;mov	[fdd_irq], byte 0
-	call	Floppy_WaitIRQ
+	fdd_wait_irq_end
 
 	print "Sensing..."
 
@@ -330,7 +296,7 @@ fdd_cylinder_prev db 0
 Floppy_Seek:
 	push	ebx
 .retry:
-	mov	bl, [fdd_track]
+	mov	bl, [fdd_cylinder]
 
 	mov	al, [fdd_cylinder_prev]
 	cmp	bl, al
@@ -348,9 +314,7 @@ Floppy_Seek:
 	mov	al, bl
 	call	Floppy_SendByte
 
-	;mov	[fdd_irq], byte 0
-	;print "Wait IRQ"
-	call	Floppy_WaitIRQ
+	fdd_wait_irq_end
 
 	mov	al, 0x08
 	call	Floppy_SendByte
@@ -374,7 +338,6 @@ Floppy_Seek:
 	call	Floppy_Init
 	jmp	.retry
 
-	;jmp ehWtf
 	cli
 	hlt
 	jmp	.error
@@ -389,8 +352,7 @@ Floppy_Recalibrate:
 	mov	al, 0x00
 	call	Floppy_SendByte
 
-	;mov	[fdd_irq], byte 0
-	call	Floppy_WaitIRQ
+	fdd_wait_irq_end
 
 	mov	al, 0x08
 	call	Floppy_SendByte
@@ -404,7 +366,7 @@ Floppy_Recalibrate:
 	jnz	.error
 
 .exit:
-	mov	[fdd_track], byte 0
+	mov	[fdd_cylinder], byte 0
 	ret
 
 .error:
@@ -481,7 +443,7 @@ Floppy_Read:
 
 	mov	[fdd_head], bh
 	mov	[fdd_sector], cl
-	mov	[fdd_track], ah
+	mov	[fdd_cylinder], ah
 
 	push	dword [ebp + 8]
 	push	.msg
@@ -492,7 +454,7 @@ Floppy_Read:
 	push	eax
 	movzx	eax, byte [fdd_head]
 	push	eax
-	movzx	eax, byte [fdd_track]
+	movzx	eax, byte [fdd_cylinder]
 	push	eax
 	push	.msg2
 	call	Terminal_Print
@@ -516,7 +478,6 @@ Floppy_Read:
 fdd_head db 0
 fdd_driveno db 0
 fdd_errorcode db 0
-fdd_track db 0
 fdd_sector db 0
 Floppy_Read2:
 	and	dh, 1
@@ -562,7 +523,7 @@ Floppy_Read2:
 .cont:
 	mov	al, [fdd_driveno]
 	call	Floppy_SendByte
-	mov	al, [fdd_track]
+	mov	al, [fdd_cylinder]
 	call	Floppy_SendByte
 
 	mov	al, [fdd_head]
@@ -580,8 +541,7 @@ Floppy_Read2:
 	call	Floppy_SendByte
 
 	print	"== Waiting IRQ =="
-	;mov	[fdd_irq], byte 0
-	call	Floppy_WaitIRQ
+	fdd_wait_irq_end
 	print	"   OK"
 
 	call	Floppy_ReadByte
