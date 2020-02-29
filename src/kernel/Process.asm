@@ -61,9 +61,10 @@ Process_Init:
 
 	ret
 
+Process_SchedulerFromIRQ:
+	add	esp, 4
 Process_Scheduler:
 	cli
-	add	esp, 4
 
 	; Save context
 	push	eax
@@ -162,6 +163,10 @@ Process_Spawn:
 	mov	eax, [ebp + 8]
 	mov	[edi + Process_t.eip], eax
 	mov	[edi + Process_t.eax], eax
+
+	mov	eax, Timer_Delay
+	mov	[edi + Process_t.ebx], eax
+
 	inc	dword [process_last_pid]
 	mov	eax, [process_last_pid]
 	mov	[edi + Process_t.pid], eax

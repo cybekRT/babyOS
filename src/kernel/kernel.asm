@@ -82,6 +82,18 @@ Init32:
 	call	Process_Init
 	print	"Init timer"
 	call	Timer_Init
+
+;.a:
+;	push	.zzz
+;	call	Terminal_Print
+;	add	esp, 4
+;
+;	push	1000
+;	call	Timer_Delay
+;	add	esp, 4
+;
+;	jmp	.a
+;.zzz db ".",0
 	
 	print	"Init floppy"
 	call	Floppy_Init
@@ -116,24 +128,17 @@ Init32:
 	call	Process_Spawn
 	add	esp, 4
 
-	print	"Started inactivity loop..."
-	sti
-.xxx:
-	push	dword [tmp_value2]
-	push	dword [tmp_value1]
-	push	dword [tmp_value]
-	push	.tmp
-	call	Terminal_Print
-	add	esp, 16
-
-	push	dword 1000
-	call	Timer_Delay
+	print	"Start C"
+	push	PidC
+	call	Process_Spawn
 	add	esp, 4
 
-	inc	dword [tmp_value]
-
+	print	"Started inactivity loop..."
+	
+	sti
+.inactivity:
 	hlt
-	jmp	.xxx
+	jmp	.inactivity
 
 	; End of kernel, halt :(
 	push	.end_of_kernel
@@ -141,7 +146,6 @@ Init32:
 	hlt
 	jmp	$-1
 .end_of_kernel db 0xA,"Kernel halted... :(",0
-.tmp db "Value: (%p) %u - %u",0xD,0
 tmp_value dd 0
 tmp_value1 dd 0
 tmp_value2 dd 0
@@ -161,6 +165,22 @@ PidB:
 
 	inc	dword [tmp_value2]
 	jmp	PidB
+
+PidC:
+	push	dword [tmp_value2]
+	push	dword [tmp_value1]
+	push	dword [tmp_value]
+	push	.tmp
+	call	Terminal_Print
+	add	esp, 16
+
+	push	dword 1000
+	call	Timer_Delay
+	add	esp, 4
+
+	inc	dword [tmp_value]
+	jmp	PidC
+.tmp db "Value: (%p) %u - %u",0xD,0
 
 Panic:
 	pushf

@@ -49,7 +49,17 @@ Timer_Delay:
 	pushf
 	sti
 .loop:
-	hlt
+	push	eax
+	;hlt
+	pushf
+	;push	dword cs
+	mov	eax, cs
+	push	eax
+	;call	.loop2
+;.loop2:
+	;xchg	bx, bx
+	call	Process_Scheduler
+	pop	eax
 	cmp	eax, [_ticks]
 	ja	.loop
 
@@ -63,7 +73,6 @@ Timer_Delay:
 .msg1 db "Waiting %u ms... ",0
 .msg2 db "OK",0xA,0
 
-omg dd 0
 ISR_PIT:
 	pushf
 
@@ -76,7 +85,7 @@ ISR_PIT:
 	pop	ax
 
 	popf
-	call	Process_Scheduler
+	call	Process_SchedulerFromIRQ
 
 	; this should never return...
 	xchg	bx, bx

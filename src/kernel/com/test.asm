@@ -20,8 +20,13 @@ main:
 	;inc	al
 	;cld
 
-	mov	ecx, 0xffffff;ff
-	loop	$
+	;mov	ecx, 0xffffff;ff
+
+	push	2000
+	call	ebx
+	add	esp, 4
+
+	;loop	$
 	pop	eax
 	inc	byte [eax + col]
 	jmp	main
