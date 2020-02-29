@@ -161,6 +161,7 @@ Process_Spawn:
 	mov	[edi + Process_t.cs], dword 0x8
 	mov	eax, [ebp + 8]
 	mov	[edi + Process_t.eip], eax
+	mov	[edi + Process_t.eax], eax
 	inc	dword [process_last_pid]
 	mov	eax, [process_last_pid]
 	mov	[edi + Process_t.pid], eax

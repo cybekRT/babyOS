@@ -117,6 +117,10 @@ Floppy_MotorOn:
 	push	eax
 	push	edx
 
+	test	byte [fdd_motor], 1
+	jnz	.exit
+
+	print	"FDD motor on!"
 	mov	dx, 0x3f2
 	mov	al, 0x1c
 	out	dx, al
@@ -127,6 +131,7 @@ Floppy_MotorOn:
 
 	mov	[fdd_motor], byte 1
 
+.exit:
 	pop	edx
 	pop	eax
 	ret
@@ -135,12 +140,17 @@ Floppy_MotorOff:
 	push	eax
 	push	edx
 
+	test	byte [fdd_motor], 1
+	jz	.exit
+
+	print	"FDD motor off!"
 	mov	dx, 0x3f2
 	mov	al, 0
 	out	dx, al
 
 	mov	[fdd_motor], byte 0
 
+.exit:
 	pop	edx
 	pop	eax
 	ret
@@ -233,6 +243,31 @@ Floppy_MotorOff:
 	%endif
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Executes FDD command with specified parameters
+; Arguments:
+;	Command code
+;	Arguments to command
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_exec 1-*
+	push	eax
+	push	edx
+
+	%rep %0
+		%if %1 = al || %1 = dl || %1 = dh
+			%error Invalid register!
+		%endif
+
+		fdd_write %1
+		%rotate 1
+	%endrep
+
+	pop	edx
+	pop	eax
+%endmacro
+
 Floppy_SendByte:
 	fdd_write al
 	ret
@@ -277,17 +312,17 @@ Floppy_Reset:
 	mov	ecx, 4
 .status:
 	mov	al, 0x08
-	call	Floppy_SendByte
+	fdd_write	0x08
 	call	Floppy_ReadByte
 	call	Floppy_ReadByte
 	loop	.status
 
 	mov	al, 0x03
-	call	Floppy_SendByte
+	fdd_write	0x03
 	mov	al, 0xDF
-	call	Floppy_SendByte
+	fdd_write	0xdf
 	mov	al, 0x02
-	call	Floppy_SendByte
+	fdd_write	0x02
 
 	print "OK"
 	ret
@@ -307,17 +342,13 @@ Floppy_Seek:
 	print	"Seeking track!"
 	fdd_wait_irq_begin
 
-	mov	al, 0x0F
-	call	Floppy_SendByte
-	mov	al, 0x00
-	call	Floppy_SendByte
-	mov	al, bl
-	call	Floppy_SendByte
+	fdd_write	0x0f
+	fdd_write	0x00
+	fdd_write	bl
 
 	fdd_wait_irq_end
 
-	mov	al, 0x08
-	call	Floppy_SendByte
+	fdd_write	0x08
 	call	Floppy_ReadByte
 	mov	ah, al
 	call	Floppy_ReadByte
@@ -347,15 +378,12 @@ Floppy_Recalibrate:
 	call	Floppy_MotorOn
 	fdd_wait_irq_begin
 
-	mov	al, 0x07
-	call	Floppy_SendByte
-	mov	al, 0x00
-	call	Floppy_SendByte
+	fdd_write	0x07
+	fdd_write	0x00
 
 	fdd_wait_irq_end
 
-	mov	al, 0x08
-	call	Floppy_SendByte
+	fdd_write	0x08
 	call	Floppy_ReadByte
 	mov	ah, al
 	call	Floppy_ReadByte
@@ -386,20 +414,6 @@ db "================"
 Floppy_Read:
 	rpush	ebp, eax, ebx, ecx, edx, esi, edi
 
-	;call	Floppy_Init
-
-	;print "Read reset:"
-	;call	Floppy_Reset
-
-	;print "  Activate"
-	;mov	dx, FDD_REG_DIGITAL_OUT
-	;mov	al, FDD_DOR_RESET | FDD_DOR_MOTA | FDD_DOR_DSELA | FDD_DOR_IRQ
-	;out	dx, al
-
-	;call	Floppy_EnableMotor
-
-	;and	[ebp + 8], dword 0b1
-
 	; LBA 2 CHS
 	mov	eax, [ebp + 8]
 	mov	bl, 18 ; [sectorsPerTrack]
@@ -413,22 +427,6 @@ Floppy_Read:
 	div	bl
 
 	mov	ch, ah ; Heads
-	;mov	ch, al ; Cylinders
-
-	;print "  Seek"
-	;movzx	eax, al
-	;push	eax
-	;call	Floppy_Seek
-	;add	esp, 4
-
-	; Start reading
-	;fdd_wait_ready_out
-
-	;push	dword [ebp + 12]
-	;push	dword [ebp + 8]
-	;push	.msg
-	;call	Terminal_Print
-	;add	esp, 12
 
 	; head -> ch
 	; sector -> cl
@@ -437,7 +435,6 @@ Floppy_Read:
 	or	ch, 0 ; drive number
 	mov	ah, al
 
-	;mov	[fdd_head], ch
 	mov	[fdd_driveno], bh
 	shl	byte [fdd_driveno], 2
 
@@ -480,21 +477,9 @@ fdd_driveno db 0
 fdd_errorcode db 0
 fdd_sector db 0
 Floppy_Read2:
-	and	dh, 1
-	;mov	[fdd_head], dh
-	shl	dh, 2
-	;mov	[fdd_driveno], dh
-
 	mov	[fdd_errorcode], byte 0x04
-	;cmp	ch, 0x51
-	;mov	[fdd_track], ch
-
-	;mov	[fdd_sector], cl
-	test	[fdd_motor], byte 1
-	jnz	.l1
 	call	Floppy_MotorOn
 
-.l1:
 	mov	dx, 0x3f7
 	mov	al, 0
 	out	dx, al
@@ -517,51 +502,42 @@ Floppy_Read2:
 
 	fdd_wait_irq_begin
 
-	mov	al, 0xe6
-	call	Floppy_SendByte
-
+	fdd_write	0xe6
 .cont:
-	mov	al, [fdd_driveno]
-	call	Floppy_SendByte
-	mov	al, [fdd_cylinder]
-	call	Floppy_SendByte
+	;mov	al, [fdd_driveno]
+	fdd_write	[fdd_driveno]
+	;mov	al, [fdd_cylinder]
+	;call	Floppy_SendByte
+	fdd_write	[fdd_cylinder]
 
-	mov	al, [fdd_head]
-	call	Floppy_SendByte
-	mov	al, [fdd_sector]
-	call	Floppy_SendByte
-	mov	al, 0x02
-	call	Floppy_SendByte
+	;mov	al, [fdd_head]
+	;call	Floppy_SendByte
+	fdd_write	[fdd_head]
+	;mov	al, [fdd_sector]
+	;call	Floppy_SendByte
+	fdd_write	[fdd_sector]
+	;mov	al, 0x02
+	;call	Floppy_SendByte
+	fdd_write	0x02
 
-	mov	al, 0x12
-	call	Floppy_SendByte
-	mov	al, 0x1b
-	call	Floppy_SendByte
-	mov	al, 0xff
-	call	Floppy_SendByte
+	fdd_write	0x12
+	fdd_write	0x1b
+	fdd_write	0xff
 
 	print	"== Waiting IRQ =="
 	fdd_wait_irq_end
 	print	"   OK"
 
-	call	Floppy_ReadByte
-	mov	[res_st0], al
-	call	Floppy_ReadByte
-	mov	[res_st1], al
-	call	Floppy_ReadByte
-	mov	[res_st2], al
-	call	Floppy_ReadByte
-	mov	[res_c], al
-	call	Floppy_ReadByte
-	mov	[res_h], al
-	call	Floppy_ReadByte
-	mov	[res_r], al
-	call	Floppy_ReadByte
-	mov	[res_n], al
+	fdd_read	[.res_st0]
+	fdd_read	[.res_st1]
+	fdd_read	[.res_st2]
+	fdd_read	[.res_c]
+	fdd_read	[.res_h]
+	fdd_read	[.res_r]
+	fdd_read	[.res_n]
 
-	test	[res_st0], byte 11000000b
+	test	[.res_st0], byte 11000000b
 	jnz	.error
-	mov	[fdd_errorcode], byte 0
 
 .exit:
 	ret
@@ -569,30 +545,29 @@ Floppy_Read2:
 .error:
 	print "Read error!"
 
-	movzx	eax, byte [res_st2]
+	movzx	eax, byte [.res_st2]
 	push	eax
-	movzx	eax, byte [res_st1]
+	movzx	eax, byte [.res_st1]
 	push	eax
-	movzx	eax, byte [res_st0]
+	movzx	eax, byte [.res_st0]
 	push	eax
 	push	.msg
 	call	Terminal_Print
 	add	esp, 16
 
-	;ret
 	cli
 	hlt
 	jmp	.error
 
 .msg db  "Status - st0: %x, st1: %x, st2: %x",0xA,0
 
-res_st0 db 0xff
-res_st1 db 0
-res_st2 db 0
-res_c db 0
-res_h db 0
-res_r db 0
-res_n db 0
+.res_st0 db 0xff
+.res_st1 db 0
+.res_st2 db 0
+.res_c db 0
+.res_h db 0
+.res_r db 0
+.res_n db 0
 
 dma_transfer:
 	push	eax

@@ -74,7 +74,7 @@ out/%.int:
 #	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/$(shell basename $< .asm).lst -I$(SRC_DIR)/kernel/ $< -o $@
 
 out/%.com: src/kernel/com/%.asm
-	nasm $< -o $@
+	nasm $< -o $@ -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}}
 
 out/%.int: 
 #src/kernel/int/%.c src/kernel/*.inc Makefile
@@ -92,6 +92,7 @@ int_doc:
 clean:
 	rm out/boot.bin out/kernel.bin out/floppy.img out/*.int out/babyOS.html lst/*.lst 2> /dev/null || true
 	rm src/kernel/interrupt_codes.inc 2> /dev/null || true
+	rm $(COM_FILES_OUT) 2> /dev/null || true
 	rmdir out lst 2> /dev/null || true
 
 # Emulators
