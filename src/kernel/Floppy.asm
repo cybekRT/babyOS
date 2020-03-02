@@ -121,7 +121,7 @@ Floppy_MotorOn:
 	jnz	.exit
 
 	print	"FDD motor on!"
-	mov	dx, 0x3f2
+	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, 0x1c
 	out	dx, al
 
@@ -144,7 +144,7 @@ Floppy_MotorOff:
 	jz	.exit
 
 	print	"FDD motor off!"
-	mov	dx, 0x3f2
+	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, 0
 	out	dx, al
 
@@ -229,6 +229,23 @@ Floppy_MotorOff:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
+; Writes one byte to FDD register
+; Arguments:
+;	destination register
+;	source/value of data byte
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_write 2
+	fdd_wait_ready_out
+	mov	dx, %1
+	%ifnidni %1, al
+		mov	al, %2
+	%endif
+	out	dx, al
+%endmacro
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
 ; Reads one byte from FDD fifo buffer
 ; Arguments:
 ;	destination of data byte
@@ -237,6 +254,24 @@ Floppy_MotorOff:
 %macro fdd_read 1
 	fdd_wait_ready_in
 	mov	dx, FDD_REG_DATA_FIFO
+	in	al, dx
+	%ifnidni %1, al
+		mov	%1, al
+	%endif
+%endmacro
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Reads one byte from FDD fifo buffer
+; Arguments:
+;	destination of data byte
+;	source register
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+%macro fdd_read 2
+	; This slows down sector reading... is there any buffering?
+	fdd_wait_ready_in
+	mov	dx, %2
 	in	al, dx
 	%ifnidni %1, al
 		mov	%1, al
@@ -256,9 +291,9 @@ Floppy_MotorOff:
 	push	edx
 
 	%rep %0
-		%if %1 = al || %1 = dl || %1 = dh
-			%error Invalid register!
-		%endif
+		;%if %1 = al || %1 = dl || %1 = dh
+		;	%error Invalid register!
+		;%endif
 
 		fdd_write %1
 		%rotate 1
@@ -268,18 +303,10 @@ Floppy_MotorOff:
 	pop	eax
 %endmacro
 
-Floppy_SendByte:
-	fdd_write al
-	ret
-
-Floppy_ReadByte:
-	fdd_read al
-	ret
-
 Floppy_Reset:
-	print "Reset FDC"
+	print	"Reset FDC"
 
-	mov	dx, 0x3f2
+	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, 00001000b
 	out	dx, al
 
@@ -287,9 +314,9 @@ Floppy_Reset:
 	call	Timer_Delay
 	add	esp, 4
 
-	print "Un-reset FDC"
+	print	"Un-reset FDC"
 
-	mov	dx, 0x3f7
+	mov	dx, FDD_REG_CONF_CONTROL
 	mov	al, 00000000b
 	out	dx, al
 
@@ -298,31 +325,27 @@ Floppy_Reset:
 	call	Timer_Delay
 	add	esp, 4
 
-	print "Wait FDC IRQ"
+	print	"Wait FDC IRQ"
 	fdd_wait_irq_begin
 
-	mov	dx, 0x3f2
+	mov	dx, FDD_REG_DIGITAL_OUT
 	mov	al, 00001100b
 	out	dx, al
 
 	fdd_wait_irq_end
 
-	print "Sensing..."
+	print	"Sensing..."
 
 	mov	ecx, 4
 .status:
-	mov	al, 0x08
 	fdd_write	0x08
-	call	Floppy_ReadByte
-	call	Floppy_ReadByte
-	loop	.status
+	fdd_read	al
+	fdd_read	al
 
-	mov	al, 0x03
-	fdd_write	0x03
-	mov	al, 0xDF
-	fdd_write	0xdf
-	mov	al, 0x02
-	fdd_write	0x02
+	dec	ecx
+	jnz	.status
+
+	fdd_exec	0x03, 0xdf, 0x02
 
 	print "OK"
 	ret
@@ -341,17 +364,13 @@ Floppy_Seek:
 
 	print	"Seeking track!"
 	fdd_wait_irq_begin
-
-	fdd_write	0x0f
-	fdd_write	0x00
-	fdd_write	bl
-
+	fdd_exec	0x0f, 0x00, bl
 	fdd_wait_irq_end
 
 	fdd_write	0x08
-	call	Floppy_ReadByte
+	fdd_read	al
 	mov	ah, al
-	call	Floppy_ReadByte
+	fdd_read	al
 
 	test	ah, 00100000b
 	jz	.error
@@ -377,16 +396,13 @@ Floppy_Recalibrate:
 
 	call	Floppy_MotorOn
 	fdd_wait_irq_begin
-
-	fdd_write	0x07
-	fdd_write	0x00
-
+	fdd_exec	0x07, 0x00
 	fdd_wait_irq_end
 
 	fdd_write	0x08
-	call	Floppy_ReadByte
+	fdd_read	al
 	mov	ah, al
-	call	Floppy_ReadByte
+	fdd_read	al
 
 	test	ah, 00100000b
 	jz	.error
@@ -474,22 +490,19 @@ Floppy_Read:
 
 fdd_head db 0
 fdd_driveno db 0
-fdd_errorcode db 0
+;fdd_errorcode db 0
 fdd_sector db 0
 Floppy_Read2:
-	mov	[fdd_errorcode], byte 0x04
+	;mov	[fdd_errorcode], byte 0x04
 	call	Floppy_MotorOn
 
-	mov	dx, 0x3f7
-	mov	al, 0
-	out	dx, al
-	mov	[fdd_errorcode], byte 0x80
+	fdd_write	FDD_REG_CONF_CONTROL, 0
+	;mov	[fdd_errorcode], byte 0x80
 
 	call	Floppy_Seek
 
 .l3:
-	mov	dx, 0x3f4
-	in	al, dx
+	fdd_read	al, FDD_REG_MAIN_STATUS
 	test	al, 00100000b
 	jnz	.error
 
@@ -501,29 +514,7 @@ Floppy_Read2:
 	call	dma_transfer
 
 	fdd_wait_irq_begin
-
-	fdd_write	0xe6
-.cont:
-	;mov	al, [fdd_driveno]
-	fdd_write	[fdd_driveno]
-	;mov	al, [fdd_cylinder]
-	;call	Floppy_SendByte
-	fdd_write	[fdd_cylinder]
-
-	;mov	al, [fdd_head]
-	;call	Floppy_SendByte
-	fdd_write	[fdd_head]
-	;mov	al, [fdd_sector]
-	;call	Floppy_SendByte
-	fdd_write	[fdd_sector]
-	;mov	al, 0x02
-	;call	Floppy_SendByte
-	fdd_write	0x02
-
-	fdd_write	0x12
-	fdd_write	0x1b
-	fdd_write	0xff
-
+	fdd_exec	0xe6, [fdd_driveno], [fdd_cylinder], [fdd_head], [fdd_sector], 0x02, 0x12, 0x1b, 0xff
 	print	"== Waiting IRQ =="
 	fdd_wait_irq_end
 	print	"   OK"
