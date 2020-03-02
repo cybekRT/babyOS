@@ -65,6 +65,9 @@ FDD_CMD_OPTION_SKIP			equ 0x20
 timeoutMsg db "Floppy timeout...",0xA,0
 fdd_irq db 0
 fdd_motor db 0
+fdd_head db 0
+fdd_driveno db 0
+fdd_sector db 0
 fdd_cylinder db 0xff
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -94,69 +97,6 @@ Floppy_IRQ:
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
-; Initializes FDD subsystem
-;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Floppy_Init:
-	print	"FDC interrupts"
-	push	IRQ2INT(IRQ_FLOPPY)
-	push	Floppy_IRQ
-	call	IDT_RegisterISR
-	add	esp, 8
-	sti
-
-	print	"FDC reset"
-	call	Floppy_Reset
-	print	"FDC recalibrate"
-	call	Floppy_Recalibrate
-	print	"FDC lock"
-	call	Floppy_Lock
-	ret
-
-Floppy_MotorOn:
-	push	eax
-	push	edx
-
-	test	byte [fdd_motor], 1
-	jnz	.exit
-
-	print	"FDD motor on!"
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0x1c
-	out	dx, al
-
-	push	dword 500
-	call	Timer_Delay
-	add	esp, 4
-
-	mov	[fdd_motor], byte 1
-
-.exit:
-	pop	edx
-	pop	eax
-	ret
-
-Floppy_MotorOff:
-	push	eax
-	push	edx
-
-	test	byte [fdd_motor], 1
-	jz	.exit
-
-	print	"FDD motor off!"
-	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 0
-	out	dx, al
-
-	mov	[fdd_motor], byte 0
-
-.exit:
-	pop	edx
-	pop	eax
-	ret
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;
 ; Wait for FDD to be ready for OUT command
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -168,8 +108,9 @@ Floppy_MotorOff:
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
-	and	al, 11000000b
-	cmp	al, 10000000b
+
+	and	al, FDD_MSR_RQM | FDD_MSR_DIO
+	cmp	al, FDD_MSR_RQM
 	jz	%%ok
 	hlt
 	loop	%%loop
@@ -196,8 +137,9 @@ Floppy_MotorOff:
 %%loop:
 	mov	dx, FDD_REG_MAIN_STATUS
 	in	al, dx
-	and	al, 11000000b
-	cmp	al, 11000000b
+
+	and	al, FDD_MSR_RQM | FDD_MSR_DIO
+	cmp	al, FDD_MSR_RQM | FDD_MSR_DIO
 	je	%%ok
 
 	loop	%%loop
@@ -270,7 +212,7 @@ Floppy_MotorOff:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 %macro fdd_read 2
 	; This slows down sector reading... is there any buffering?
-	fdd_wait_ready_in
+	;fdd_wait_ready_in
 	mov	dx, %2
 	in	al, dx
 	%ifnidni %1, al
@@ -303,11 +245,75 @@ Floppy_MotorOff:
 	pop	eax
 %endmacro
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Initializes FDD subsystem
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Floppy_Init:
+	print	"FDC interrupts"
+	push	IRQ2INT(IRQ_FLOPPY)
+	push	Floppy_IRQ
+	call	IDT_RegisterISR
+	add	esp, 8
+	sti
+
+	print	"FDC reset"
+	call	Floppy_Reset
+	print	"FDC recalibrate"
+	call	Floppy_Recalibrate
+	print	"FDC lock"
+	call	Floppy_Lock
+	ret
+
+Floppy_MotorOn:
+	push	eax
+	push	edx
+
+	test	byte [fdd_motor], 1
+	jnz	.exit
+
+	print	"FDD motor on!"
+	mov	dx, FDD_REG_DIGITAL_OUT
+	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ | FDD_DOR_MOTA
+	out	dx, al
+
+	push	dword 500
+	call	Timer_Delay
+	add	esp, 4
+
+	mov	[fdd_motor], byte 1
+
+.exit:
+	pop	edx
+	pop	eax
+	ret
+
+Floppy_MotorOff:
+	push	eax
+	push	edx
+
+	test	byte [fdd_motor], 1
+	jz	.exit
+
+	print	"FDD motor off!"
+	mov	dx, FDD_REG_DIGITAL_OUT
+	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ
+	out	dx, al
+
+	mov	[fdd_motor], byte 0
+
+.exit:
+	pop	edx
+	pop	eax
+	ret
+
+
 Floppy_Reset:
 	print	"Reset FDC"
 
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 00001000b
+	mov	al, FDD_DOR_IRQ
 	out	dx, al
 
 	push	dword 1000
@@ -317,7 +323,7 @@ Floppy_Reset:
 	print	"Un-reset FDC"
 
 	mov	dx, FDD_REG_CONF_CONTROL
-	mov	al, 00000000b
+	mov	al, FDD_DSR_TYPE_144
 	out	dx, al
 
 
@@ -329,7 +335,7 @@ Floppy_Reset:
 	fdd_wait_irq_begin
 
 	mov	dx, FDD_REG_DIGITAL_OUT
-	mov	al, 00001100b
+	mov	al, FDD_DOR_RESET | FDD_DOR_IRQ
 	out	dx, al
 
 	fdd_wait_irq_end
@@ -338,14 +344,15 @@ Floppy_Reset:
 
 	mov	ecx, 4
 .status:
-	fdd_write	0x08
+	fdd_write	FDD_CMD_SENSE_INTERRUPT
 	fdd_read	al
 	fdd_read	al
 
 	dec	ecx
 	jnz	.status
 
-	fdd_exec	0x03, 0xdf, 0x02
+	print	"Specify"
+	fdd_exec	FDD_CMD_SPECIFY, 0xdf, 0x02
 
 	print "OK"
 	ret
@@ -364,17 +371,16 @@ Floppy_Seek:
 
 	print	"Seeking track!"
 	fdd_wait_irq_begin
-	fdd_exec	0x0f, 0x00, bl
+	fdd_exec	FDD_CMD_SEEK, 0x00, bl
 	fdd_wait_irq_end
 
-	fdd_write	0x08
-	fdd_read	al
-	mov	ah, al
+	fdd_exec	FDD_CMD_SENSE_INTERRUPT
+	fdd_read	ah
 	fdd_read	al
 
-	test	ah, 00100000b
+	test	ah, FDD_MSR_NDMA
 	jz	.error
-	test	ah, 10000000b
+	test	ah, FDD_MSR_RQM
 	jnz	.error
 
 	print	"Seek ok!"
@@ -396,12 +402,11 @@ Floppy_Recalibrate:
 
 	call	Floppy_MotorOn
 	fdd_wait_irq_begin
-	fdd_exec	0x07, 0x00
+	fdd_exec	FDD_CMD_RECALIBRATE, 0x00
 	fdd_wait_irq_end
 
-	fdd_write	0x08
-	fdd_read	al
-	mov	ah, al
+	fdd_write	FDD_CMD_SENSE_INTERRUPT
+	fdd_read	ah
 	fdd_read	al
 
 	test	ah, 00100000b
@@ -488,33 +493,21 @@ Floppy_Read:
 .msg db "Reading LBA: %u",0xA,0
 .msg2 db "Cylinder: %u, Head: %u, Sector: %u",0xA,0
 
-fdd_head db 0
-fdd_driveno db 0
-;fdd_errorcode db 0
-fdd_sector db 0
 Floppy_Read2:
-	;mov	[fdd_errorcode], byte 0x04
 	call	Floppy_MotorOn
-
 	fdd_write	FDD_REG_CONF_CONTROL, 0
-	;mov	[fdd_errorcode], byte 0x80
-
 	call	Floppy_Seek
 
-.l3:
 	fdd_read	al, FDD_REG_MAIN_STATUS
-	test	al, 00100000b
+	test	al, FDD_MSR_NDMA
 	jnz	.error
 
 .read_fdd:
-	mov	bl, 2
-	mov	esi, 512
-	mov	ecx, 0x80000
-	mov	bh, 0
 	call	dma_transfer
 
 	fdd_wait_irq_begin
-	fdd_exec	0xe6, [fdd_driveno], [fdd_cylinder], [fdd_head], [fdd_sector], 0x02, 0x12, 0x1b, 0xff
+	fdd_exec	FDD_CMD_OPTION_MULTITRACK | FDD_CMD_OPTION_MFM | FDD_CMD_OPTION_SKIP | FDD_CMD_READ_DATA, \
+		[fdd_driveno], [fdd_cylinder], [fdd_head], [fdd_sector], 0x02, 0x12, 0x1b, 0xff
 	print	"== Waiting IRQ =="
 	fdd_wait_irq_end
 	print	"   OK"
@@ -600,7 +593,3 @@ dma_transfer:
 
 	pop	eax
 	ret
-
-.status db "FDD Status: %b",0xA,0
-.version db "FDD Version: %x",0xA,0
-.lock db "FDD Lock: %x",0xA,0
