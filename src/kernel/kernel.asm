@@ -116,6 +116,7 @@ Init32:
 	push	eax
 	call	Process_Spawn
 	add	esp, 4
+	call	Keyboard_Init
 
 	; Spawn some processes...
 	print	"Start A"
@@ -264,6 +265,7 @@ times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 %include "Process.asm"
 %include "Floppy.asm"
 %include "FAT12.asm"
+%include "Keyboard.asm"
 
 align 32
 
