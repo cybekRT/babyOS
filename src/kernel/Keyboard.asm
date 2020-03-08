@@ -38,7 +38,12 @@ Keyboard_IRQ:
 	add	edi, eax
 
 	in	al, 0x60
-	and	al, 01111111b
+	;and	al, 01111111b
+	;movzx	eax, al
+
+	call	Keyboard_ScanCode2KeyCode
+	jc	.exit
+
 	mov	[edi], al
 
 	mov	al, [kbd_w]
@@ -55,11 +60,12 @@ Keyboard_IRQ:
 	mov	[kbd_w], al
 
 	movzx	eax, byte [edi]
+	push	dword [KBD_KeyCodes + eax * KBD_KEYCODE_t_size + KBD_KEYCODE_t.asciiLow]
 	push	eax
 	push	.msg
 	;print	"."
 	call	Terminal_Print
-	add	esp, 8
+	add	esp, 12
 
 .exit:
 	mov	al, 0x20
@@ -76,4 +82,29 @@ Keyboard_IRQ:
 	in	al, 0x60
 	jmp	.exit
 
-.msg db "Pressed: %x",0xA,0
+.msg db "Pressed: %x - %c",0xA,0
+
+Keyboard_ScanCode2KeyCode:
+	push	esi
+
+	mov	esi, KBD_KeyCodes
+.loop:
+	cmp	[esi + KBD_KEYCODE_t.scanCode], ax
+	je	.found
+
+	add	esi, KBD_KEYCODE_t_size
+	cmp	esi, KBD_KeyCodes_end
+	je	.not_found
+	jmp	.loop
+
+.found:
+	movzx	eax, byte [esi + KBD_KEYCODE_t.keyCode]
+	clc
+	jmp	.exit
+
+.not_found:
+	mov	eax, KBD_NONE
+	stc
+.exit:
+	pop	esi
+	ret
