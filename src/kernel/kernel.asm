@@ -135,6 +135,11 @@ Init32:
 	;call	Process_Spawn
 	add	esp, 4
 
+	print	"Start D"
+	push	PidD
+	call	Process_Spawn
+	add	esp, 4
+
 	print	"Started inactivity loop..."
 	
 	sti
@@ -183,6 +188,24 @@ PidC:
 	inc	dword [tmp_value]
 	jmp	PidC
 .tmp db "Value: (%p) %u - %u",0xD,0
+
+PidD:
+.loop:
+	hlt
+
+	call	Keyboard_ReadKey
+	jc	.loop
+
+	call	Keyboard_Key2AsciiLow
+	movzx	eax, al
+	push	eax
+	push	.tmp
+	call	Terminal_Print
+	add	esp, 8
+
+	jmp	PidD
+.tmp db "%c",0
+.upper db 0
 
 Panic:
 	pushf

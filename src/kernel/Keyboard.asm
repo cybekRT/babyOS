@@ -37,10 +37,17 @@ Keyboard_IRQ:
 	movzx	eax, byte [kbd_w]
 	add	edi, eax
 
+	xor	eax, eax
+.read_code:
 	in	al, 0x60
 	;and	al, 01111111b
-	;movzx	eax, al
+	cmp	al, 0x60
+	jne	.whole_code
 
+	shl	eax, 8
+	jmp	.read_code
+
+.whole_code:
 	call	Keyboard_ScanCode2KeyCode
 	jc	.exit
 
@@ -49,23 +56,8 @@ Keyboard_IRQ:
 	mov	al, [kbd_w]
 	inc	al
 	and	al, KBD_BUFFER_SIZE - 1
-	;movzx	eax, byte [kbd_w]
-	;inc	eax
-	;mov	edx, 0
-	;mov	ebx, KBD_BUFFER_SIZE
-	;xchg bx, bx
-	;div	ebx
 
-	;mov	[kbd_w], dl
 	mov	[kbd_w], al
-
-	movzx	eax, byte [edi]
-	push	dword [KBD_KeyCodes + eax * KBD_KEYCODE_t_size + KBD_KEYCODE_t.asciiLow]
-	push	eax
-	push	.msg
-	;print	"."
-	call	Terminal_Print
-	add	esp, 12
 
 .exit:
 	mov	al, 0x20
@@ -82,7 +74,7 @@ Keyboard_IRQ:
 	in	al, 0x60
 	jmp	.exit
 
-.msg db "Pressed: %x - %c",0xA,0
+.msg db "Pressed: %p - %p - %c",0xA,0
 
 Keyboard_ScanCode2KeyCode:
 	push	esi
@@ -103,8 +95,44 @@ Keyboard_ScanCode2KeyCode:
 	jmp	.exit
 
 .not_found:
+	movzx	eax, ax
+	push	eax
+	push	.msg
+	;call	Terminal_Print
+	add	esp, 8
+
 	mov	eax, KBD_NONE
 	stc
 .exit:
 	pop	esi
+	ret
+.msg db "Pressed: %x",0xA,0
+
+Keyboard_ReadKey:
+	; Check if buffer is not empty
+	mov	al, [kbd_w]
+	mov	ah, [kbd_r]
+	cmp	al, ah
+	je	.empty
+
+	movzx	eax, byte [kbd_r]
+	movzx	eax, byte [kbd_buffer + eax]
+
+	inc	byte [kbd_r]
+	and	byte [kbd_r], KBD_BUFFER_SIZE - 1
+.exit:
+	ret
+.empty:
+	mov	al, 0
+	stc
+	jmp	.exit
+
+Keyboard_Key2AsciiLow:
+	movzx	eax, al
+	mov	al, [KBD_KeyCodes + eax * KBD_KEYCODE_t_size + KBD_KEYCODE_t.asciiLow]
+	ret
+
+Keyboard_Key2AsciiHigh:
+	movzx	eax, al
+	mov	al, [KBD_KeyCodes + eax * KBD_KEYCODE_t_size + KBD_KEYCODE_t.asciiHigh]
 	ret

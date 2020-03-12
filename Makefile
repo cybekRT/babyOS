@@ -51,7 +51,7 @@ out/boot.bin: $(SRC_DIR)/boot/boot.asm $(SRC_DIR)/*.inc
 
 # Kernel
 kernel: dirs int out/kernel.bin
-out/kernel.bin: src/kernel/*.asm src/kernel/*.inc $(SRC_DIR)/*.inc $(SRC_DIR)/kernel/*.inc
+out/kernel.bin: $(SRC_DIR)/*.inc $(SRC_DIR)/kernel/*.asm $(SRC_DIR)/kernel/*.inc
 	$(NASM) $(NASM_FLAGS) -l$(LST_DIR)/${addsuffix .lst, ${basename ${notdir $@} .bin}} -I$(SRC_DIR)/kernel/ $(SRC_DIR)/kernel/kernel.asm -o $@
 
 # Interrupts

@@ -53,6 +53,8 @@ Terminal_Put:
 	; Special chars
 	mov	al, byte [ebp + 8]
 
+	cmp	al, 0x08 ; backspace
+	je	.BS
 	cmp	al, 0x0D ; carriage return
 	je	.CR
 	cmp	al, 0x0A ; line feed
@@ -61,6 +63,9 @@ Terminal_Put:
 	je	.Tab
 	jmp	.normalChar
 
+.BS:
+	call	Terminal_BS
+	jmp	.exit
 .CR:
 	call	Terminal_CR
 	jmp	.exit
@@ -153,6 +158,26 @@ Terminal_Put:
 .exit:
 	rpop
 	ret
+
+Terminal_BS:
+	mov	ax, word [cursorX]
+	cmp	ax, 0
+	jz	.x_zero
+
+	dec	word [cursorX]
+.exit:
+	ret
+.x_zero:
+	mov	word [cursorX], 320 / fontWidth - 2
+	mov	ax, [cursorY]
+	cmp	ax, 0
+	jz	.y_zero
+
+	dec	word [cursorY]
+	jmp	.exit
+.y_zero:
+	mov	word [cursorX], 0
+	jmp	.exit
 
 Terminal_CR:
 	mov	word [cursorX], 0
