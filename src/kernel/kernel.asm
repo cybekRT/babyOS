@@ -144,7 +144,14 @@ Init32:
 	
 	sti
 .inactivity:
-	hlt
+	;hlt
+
+	push	200
+	call	Timer_Delay
+	add	esp, 4
+
+	call	Terminal_Cursor
+
 	jmp	.inactivity
 
 	; End of kernel, halt :(

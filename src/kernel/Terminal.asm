@@ -1,7 +1,15 @@
-cursorX dw 0
-cursorY dw 0
 cursorColor db 0xA
 backgroundColor db 0x18
+
+CURSOR_OFFSET_X_CFG equ 5
+CURSOR_OFFSET_Y_CFG equ 1
+
+SCREEN_WIDTH equ 320
+SCREEN_HEIGHT equ 200
+CURSOR_OFFSET_X equ (CURSOR_OFFSET_X_CFG * 2 + fontWidth - 1) / fontWidth * fontWidth / 2
+CURSOR_OFFSET_Y equ (CURSOR_OFFSET_Y_CFG * 2 + fontHeight - 1) / fontHeight * fontHeight / 2
+cursorX dw 0
+cursorY dw 0
 
 %include "data/font.def"
 
@@ -17,23 +25,13 @@ Terminal_Init:
 	mov	word [cursorY], 0
 
 	mov	al, [backgroundColor]
-	mov	ecx, 320*200
+	mov	ecx, SCREEN_WIDTH * SCREEN_HEIGHT
 	mov	edi, 0xa0000
 	rep stosb
 
 	push	.helloMsg
 	call	Terminal_Print
 	add	esp, 4
-
-	;push	dword 0xbaadf00d
-	;push	dword 0xabcdef12
-	;push	dword 0x4321
-	;push	dword 2109
-	;push	dword -2109
-	;push	dword -2109
-	;push	.testMsg
-	;call	Terminal_Print
-	;add	esp, 28
 
 	rpop
 	ret
@@ -49,6 +47,10 @@ Terminal_Init:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Terminal_Put:
 	rpush	ebp, eax, ebx, ecx, edx, esi, edi
+	pushf
+	cli
+
+	call	Terminal_ClearCursor
 
 	; Special chars
 	mov	al, byte [ebp + 8]
@@ -80,9 +82,9 @@ Terminal_Put:
 	mov	ax, [cursorY]
 	mov	bx, fontHeight
 	mul	bx
-	add	ax, fontHeight / 2
+	add	ax, CURSOR_OFFSET_Y
 
-	mov	bx, 320
+	mov	bx, SCREEN_WIDTH
 	mul	bx
 
 	push	dx
@@ -91,7 +93,7 @@ Terminal_Put:
 	mov	ax, [cursorX]
 	mov	bx, fontWidth
 	mul	bx
-	add	ax, fontWidth / 2
+	add	ax, CURSOR_OFFSET_X
 
 	movzx	eax, ax
 	pop	edx
@@ -131,31 +133,16 @@ Terminal_Put:
 
 	pop	ecx
 	inc	esi
-	add	edi, 320 - fontWidth
+	add	edi, SCREEN_WIDTH - fontWidth
 	loop	.yLoop
 
 	inc	word [cursorX]
-	cmp	word [cursorX], 320 / fontWidth - 1
-	jne	.exit
-
-	call	Terminal_LF
-	jmp	.exit
-
-	mov	word [cursorX], 0
-	inc	word [cursorY]
-	mov	ax, [cursorY]
-	mov	bx, fontHeight
-	mul	bx
-	add	ax, fontHeight / 2
-	add	ax, fontHeight - 1
-	;cmp	ax, 200 - (fontHeight / 2) * 2
-	cmp	ax, 160
+	cmp	word [cursorX], (SCREEN_WIDTH - CURSOR_OFFSET_X * 2) / fontWidth
 	jb	.exit
 
-	dec	word [cursorY]
-	call	Terminal_Scroll
-
+	call	Terminal_LF
 .exit:
+	popf
 	rpop
 	ret
 
@@ -168,7 +155,7 @@ Terminal_BS:
 .exit:
 	ret
 .x_zero:
-	mov	word [cursorX], 320 / fontWidth - 2
+	mov	word [cursorX], (SCREEN_WIDTH - CURSOR_OFFSET_X * 2) / fontWidth - 1
 	mov	ax, [cursorY]
 	cmp	ax, 0
 	jz	.y_zero
@@ -187,12 +174,8 @@ Terminal_LF:
 	mov	word [cursorX], 0
 	inc	word [cursorY]
 	mov	ax, [cursorY]
-	mov	bx, fontHeight
-	mul	bx
-	add	ax, fontHeight - 1
-	add	ax, (fontHeight / 2)
-	cmp	ax, 200 - (fontHeight / 2)
-	jbe	.exit
+	cmp	ax, (SCREEN_HEIGHT - CURSOR_OFFSET_Y * 2) / fontHeight
+	jb	.exit
 
 	dec	word [cursorY]
 	call	Terminal_Scroll
@@ -223,14 +206,14 @@ Terminal_Tab:
 
 Terminal_Scroll:
 	; Scroll
-	mov	esi, 0xa0000 + 320 * (fontHeight + fontHeight / 2)
-	mov	edi, 0xa0000 + 320 * (fontHeight / 2)
-	mov	ecx, 320 * (200 / fontHeight - 1) * fontHeight
+	mov	esi, 0xa0000 + SCREEN_WIDTH * (fontHeight + CURSOR_OFFSET_Y)
+	mov	edi, 0xa0000 + SCREEN_WIDTH * (CURSOR_OFFSET_Y)
+	mov	ecx, SCREEN_WIDTH * (SCREEN_HEIGHT / fontHeight - 1) * fontHeight
 	rep movsb
 	; Clear line
 	mov	al, [backgroundColor]
-	mov	edi, 0xa0000 + 320 * (200 / fontHeight - 1) * fontHeight
-	mov	ecx, 320 * fontHeight
+	mov	edi, 0xa0000 + SCREEN_WIDTH * (SCREEN_HEIGHT / fontHeight - 1) * fontHeight
+	mov	ecx, SCREEN_WIDTH * fontHeight
 	rep stosb
 
 	ret
@@ -469,3 +452,79 @@ Terminal_Print:
 
 ;.hex_0x db "0x",0
 .hex_ascii db "0123456789ABCDEF"
+
+
+cursor_loop_id db 0
+
+Terminal_Cursor:
+	pushf
+	cli
+
+	call	Terminal_CursorLoop
+	xor	byte [cursor_loop_id], 1
+
+	popf
+	ret
+
+Terminal_DrawCursor:
+	cmp	byte [cursor_loop_id], 1
+	je	.exit
+
+	call	Terminal_CursorLoop
+.exit:
+	mov	byte [cursor_loop_id], 1
+	ret
+
+Terminal_ClearCursor:
+	cmp	byte [cursor_loop_id], 0
+	je	.exit
+
+	call	Terminal_CursorLoop
+.exit:
+	mov	byte [cursor_loop_id], 0
+	ret
+
+Terminal_CursorLoop:
+	rpush	eax, ebx, edx
+
+	mov	ax, word [cursorY]
+	mov	bx, fontHeight
+	mul	bx
+	add	ax, CURSOR_OFFSET_Y
+
+	mov	bx, SCREEN_WIDTH
+	mul	bx
+
+	push	ax
+	mov	ax, word [cursorX]
+	mov	bx, fontWidth
+	mul	bx
+
+	add	ax, CURSOR_OFFSET_X
+	pop	bx
+	add	ax, bx
+
+	movzx	eax, ax
+	add	eax, 0xa0000
+	xchg bx, bx
+
+	mov	ecx, fontHeight
+.loop_y:
+	push	ecx
+	mov	ecx, fontWidth
+.loop_x:
+	xor	byte [eax], 0x3
+	inc	eax
+
+	dec	ecx
+	jnz	.loop_x
+
+	pop	ecx
+	add	eax, SCREEN_WIDTH - fontWidth
+
+	dec	ecx
+	jnz	.loop_y
+
+	rpop
+	ret
+
