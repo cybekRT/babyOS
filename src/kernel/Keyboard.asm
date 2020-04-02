@@ -3,11 +3,24 @@ kbd_buffer times KBD_BUFFER_SIZE db 0
 kbd_w db 0
 kbd_r db 0
 
+Keyboard_Handler:
+	;print	"keyboard"
+	ret
+
 Keyboard_Init:
 	push	dword IRQ2INT(IRQ_KEYBOARD)
 	push	dword Keyboard_IRQ
 	call	IDT_RegisterISR
 	add	esp, 8
+
+	;mov	eax, Keyboard_Handler
+	push	Keyboard_Handler
+	call	Kernel_Register
+	;mov	eax, Keyboard_Handler
+	call	Kernel_Register
+	add	esp, 4
+	;mov	eax, Keyboard_Handler
+	;call	Kernel_Register
 
 	; Clear internal buffer
 	; TODO some reset logic?

@@ -33,6 +33,10 @@ Terminal_Init:
 	call	Terminal_Print
 	add	esp, 4
 
+	push	Terminal_Cursor
+	call	Kernel_Register
+	add	esp, 4
+
 	rpop
 	ret
 .helloMsg db OS_NAME,0xA,0xA,0
@@ -456,13 +460,23 @@ Terminal_Print:
 
 cursor_loop_id db 0
 
+cursorTimer dd 0
 Terminal_Cursor:
 	pushf
 	cli
 
+	mov	eax, [_ticks]
+	cmp	eax, [cursorTimer]
+	jb	.exit
+
 	call	Terminal_CursorLoop
 	xor	byte [cursor_loop_id], 1
 
+	mov	eax, [_ticks]
+	add	eax, 200
+	mov	[cursorTimer], eax
+
+.exit:
 	popf
 	ret
 

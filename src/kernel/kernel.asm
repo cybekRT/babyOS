@@ -122,17 +122,17 @@ Init32:
 	; Spawn some processes...
 	print	"Start A"
 	push	dword PidA
-	;call	Process_Spawn
+	call	Process_Spawn
 	add	esp, 4
 
 	print	"Start B"
 	push	PidB
-	;call	Process_Spawn
+	call	Process_Spawn
 	add	esp, 4
 
 	print	"Start C"
 	push	PidC
-	;call	Process_Spawn
+	call	Process_Spawn
 	add	esp, 4
 
 	print	"Start D"
@@ -144,14 +144,8 @@ Init32:
 	
 	sti
 .inactivity:
-	;hlt
-
-	push	200
-	call	Timer_Delay
-	add	esp, 4
-
-	call	Terminal_Cursor
-
+	hlt
+	call	Kernel_ExecuteHandlers
 	jmp	.inactivity
 
 	; End of kernel, halt :(
@@ -214,79 +208,98 @@ PidD:
 .tmp db "%c",0
 .upper db 0
 
-Panic:
-	pushf
-	push	dword [esp + 4] ; eip
-
-	push	esp
-	push	ebp
-	push	edi
-	push	esi
-	push	edx
-	push	ecx
-	push	ebx
-	push	eax
-	push	.panicMsg
-
-.fill_background:
-	mov	al, 10
-	mov	edi, 0xa0000
-	mov	ecx, 320*200
-	;rep	stosb
-
-	;call	Terminal_Init
-	call	Terminal_Print
-	add	esp, 11*4
-
-.background:
-	mov	al, 12
-	; top
-	mov	edi, 0xa0000
-	mov	ecx, 320
-	rep	stosb
-	; bottom
-	mov	edi, 0xa0000 + 199*320
-	mov	ecx, 320
-	rep	stosb
-	; left
-	mov	edi, 0xa0000
-	mov	ecx, 200
-.left_loop:
-	mov	[edi], al
-	add	edi, 320
-	loop	.left_loop
-	; right
-	mov	edi, 0xa0000 + 319
-	mov	ecx, 200
-.right_loop:
-	mov	[edi], al
-	add	edi, 320
-	loop	.right_loop
-
-	; Halt
-	cli
-	hlt
-	jmp	$-1
-
-.panicMsg db "Kernel panic...",0xA,0xA
-db "  EAX:   %p",0xA
-db "  EBX:   %p",0xA
-db "  ECX:   %p",0xA
-db "  EDX:   %p",0xA
-db "  ESI:   %p",0xA
-db "  EDI:   %p",0xA
-db "  EBP:   %p",0xA
-db "  ESP:   %p",0xA
-db "  EIP:   %p",0xA
-db "  Flags: %x"
-db 0
-
 align 16
 times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 stackEnd:
 times 512 db 0
 stackBegin:
 times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
+
+struc KernelHandlerItem
+	.handler	resd 1,
+	.next	resd 1
+endstruc
+
+kernelHandlers dd 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+; Register kernel function
+; Arguments:
+; 	;eax	- handler
+;	(ebp + 8)	- handler
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Kernel_Register:
+	rpush	ebp, ebx
+
+	mov	ebx, [ebp + 8]
+	;mov	ebx, eax
+
+	push	KernelHandlerItem_size
+	call	Memory_Alloc
+	add	esp, 4
+
+	mov	dword [eax + KernelHandlerItem.handler], ebx
+	mov	dword [eax + KernelHandlerItem.next], 0
+
+	cmp	dword [kernelHandlers], 0
+	jnz	.addToList
+
+	mov	dword [kernelHandlers], eax
+	jmp	.exit
+
+.addToList:
+	xchg bx, bx
+	mov	ebx, eax
+	mov	eax, [kernelHandlers]
+.searchLastEntry:
+	cmp	dword [eax + KernelHandlerItem.next], 0
+	jz	.insertEntry
+	push	dword [eax + KernelHandlerItem.next]
+	pop	eax
+	jmp	.searchLastEntry
+
+.insertEntry:
+	mov	dword [eax + KernelHandlerItem.next], ebx
+
+	push	eax
+	push	ebx
+	push	.msg
+	call	Terminal_Print
+	add	esp, 12
+
+.exit:
+	rpop
+	ret
+.msg db "Inserted: %p at %p",0xA,0
+
+Kernel_ExecuteHandlers:
+	xchg bx, bx
+	;print	"Executing handlers..."
+	mov	eax, [kernelHandlers]
+
+.loop:
+	cmp	eax, 0
+	jz	.exit
+
+	push	dword [eax + KernelHandlerItem.next]
+	mov	ebx, dword [eax + KernelHandlerItem.handler]
+
+	;push	ebx
+	;push	.msg
+	;call	Terminal_Print
+	;add	esp, 8
+
+	call	ebx
+
+	pop	eax
+	jmp	.loop
+
+.exit:
+	ret
+.msg db "Address: %p",0xA,0
+
 
 %include "GDT.asm"
 %include "IDT.asm"
@@ -296,6 +309,7 @@ times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 %include "Process.asm"
 %include "Floppy.asm"
 %include "FAT12.asm"
+%include "Panic.asm"
 
 %include "Keyboard.inc"
 %include "Keyboard.asm"
