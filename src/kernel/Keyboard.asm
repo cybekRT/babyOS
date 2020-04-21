@@ -4,7 +4,12 @@ kbd_w db 0
 kbd_r db 0
 
 Keyboard_Handler:
-	;print	"keyboard"
+	call	Keyboard_ReadKey
+	jc	.exit
+
+	print	"keyboard"
+
+.exit:
 	ret
 
 Keyboard_Init:
@@ -13,14 +18,8 @@ Keyboard_Init:
 	call	IDT_RegisterISR
 	add	esp, 8
 
-	;mov	eax, Keyboard_Handler
 	push	Keyboard_Handler
 	call	Kernel_Register
-	;mov	eax, Keyboard_Handler
-	call	Kernel_Register
-	add	esp, 4
-	;mov	eax, Keyboard_Handler
-	;call	Kernel_Register
 
 	; Clear internal buffer
 	; TODO some reset logic?

@@ -73,6 +73,10 @@ Timer_Delay:
 .msg1 db "Waiting %u ms... ",0
 .msg2 db "OK",0xA,0
 
+Timer_Get:
+	mov	eax, [_ticks]
+	ret
+
 ISR_PIT:
 	pushf
 

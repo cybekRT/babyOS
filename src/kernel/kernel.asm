@@ -77,143 +77,34 @@ Init32:
 	add	eax, 8192
 	mov	esp, eax
 
+	call	LinkedList_Create
+	mov	[kernelHandlers], eax
+
 	; Initialize rest of kernel services
 	print	"Init scheduler"
 	call	Process_Init
 	print	"Init timer"
 	call	Timer_Init
 
-;.a:
-;	push	.zzz
-;	call	Terminal_Print
-;	add	esp, 4
-;
-;	push	1000
-;	call	Timer_Delay
-;	add	esp, 4
-;
-;	jmp	.a
-;.zzz db ".",0
-	
-	print	"Init floppy"
-	;call	Floppy_Init
-	print	"Floppy inited!"
-
-	;call	FAT12_Init
-	;call	FAT12_OpenRoot
-
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadDirectory
-	;call	FAT12_ReadWholeFile
-
-	call	Floppy_MotorOff
-
-	;push	eax
-	;call	Process_Spawn
-	;add	esp, 4
-
+	print	"Init keyboard"
 	call	Keyboard_Init
+	
+	;print	"Init floppy"
+	;call	Floppy_Init
 
-	; Spawn some processes...
-	print	"Start A"
-	push	dword PidA
-	call	Process_Spawn
-	add	esp, 4
-
-	print	"Start B"
-	push	PidB
-	call	Process_Spawn
-	add	esp, 4
-
-	print	"Start C"
-	push	PidC
-	call	Process_Spawn
-	add	esp, 4
-
-	print	"Start D"
-	push	PidD
-	call	Process_Spawn
-	add	esp, 4
+	;print	"Init FAT12"
+	;call	FAT12_Init
 
 	print	"Started inactivity loop..."
-	
 	sti
 .inactivity:
 	hlt
 	call	Kernel_ExecuteHandlers
 	jmp	.inactivity
 
-	; End of kernel, halt :(
-	push	.end_of_kernel
-	;call	Terminal_Print
-	hlt
-	jmp	$-1
-.end_of_kernel db 0xA,"Kernel halted... :(",0
-tmp_value dd 0
-tmp_value1 dd 0
-tmp_value2 dd 0
-
-PidA:
-	push	1000
-	call	Timer_Delay
-	add	esp, 4
-
-	inc	dword [tmp_value1]
-	jmp	PidA
-
-PidB:
-	push	3000
-	call	Timer_Delay
-	add	esp, 4
-
-	inc	dword [tmp_value2]
-	jmp	PidB
-
-PidC:
-	push	dword [tmp_value2]
-	push	dword [tmp_value1]
-	push	dword [tmp_value]
-	push	.tmp
-	call	Terminal_Print
-	add	esp, 16
-
-	push	dword 1000
-	call	Timer_Delay
-	add	esp, 4
-
-	inc	dword [tmp_value]
-	jmp	PidC
-.tmp db "Value: (%p) %u - %u",0xD,0
-
-PidD:
-.loop:
-	hlt
-
-	call	Keyboard_ReadKey
-	jc	.loop
-
-	call	Keyboard_Key2AsciiLow
-	movzx	eax, al
-	push	eax
-	push	.tmp
-	call	Terminal_Print
-	add	esp, 8
-
-	jmp	PidD
-.tmp db "%c",0
-.upper db 0
-
-align 16
-times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 stackEnd:
 times 512 db 0
 stackBegin:
-times 32 db 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF
 
 struc KernelHandlerItem
 	.handler	resd 1,
@@ -226,11 +117,20 @@ kernelHandlers dd 0
 ;
 ; Register kernel function
 ; Arguments:
-; 	;eax	- handler
 ;	(ebp + 8)	- handler
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Kernel_Register:
+	rpush	ebp
+
+	push	dword [kernelHandlers]
+	push	dword [ebp + 8]
+	call	LinkedList_Insert
+	add	esp, 8
+
+	rpop
+	ret
+
 	rpush	ebp, ebx
 
 	mov	ebx, [ebp + 8]
@@ -274,32 +174,62 @@ Kernel_Register:
 	ret
 .msg db "Inserted: %p at %p",0xA,0
 
-Kernel_ExecuteHandlers:
-	xchg bx, bx
-	;print	"Executing handlers..."
-	mov	eax, [kernelHandlers]
+Kernel_Unregister:
+	rpush	ebp, ebx
 
+	; TODO
+
+	rpop
+	ret
+
+Kernel_ExecuteHandlers:
+;	mov	dword [.iteratePointer], 0
+;
+;	push	dword [kernelHandlers]
+;	push	dword .iteratePointer
+;.loop:
+;	call	LinkedList_Iterate
+;	cmp	eax, 0
+;	jz	.exit
+;
+;	print	"Call"
+;	call	dword [.iteratePointer]
+;	jmp	.loop
+;
+;.exit:
+;	add	esp, 8
+;	ret
+
+	mov	eax, [kernelHandlers]
 .loop:
+	cmp	dword [eax + LinkedList.next], 0
+	jz	.exit
+
+	mov	eax, [eax + LinkedList.next]
+	mov	ebx, [eax + LinkedList.data]
+	push	eax
+	call	ebx
+	pop	eax
+.exit:
+	ret
+
+	mov	eax, [kernelHandlers]
+;.loop:
 	cmp	eax, 0
 	jz	.exit
 
 	push	dword [eax + KernelHandlerItem.next]
 	mov	ebx, dword [eax + KernelHandlerItem.handler]
 
-	;push	ebx
-	;push	.msg
-	;call	Terminal_Print
-	;add	esp, 8
-
 	call	ebx
 
 	pop	eax
 	jmp	.loop
 
-.exit:
+;.exit:
 	ret
 .msg db "Address: %p",0xA,0
-
+.iteratePointer dd 0
 
 %include "GDT.asm"
 %include "IDT.asm"
@@ -310,6 +240,7 @@ Kernel_ExecuteHandlers:
 %include "Floppy.asm"
 %include "FAT12.asm"
 %include "Panic.asm"
+%include "LinkedList.asm"
 
 %include "Keyboard.inc"
 %include "Keyboard.asm"

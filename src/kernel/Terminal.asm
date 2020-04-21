@@ -465,14 +465,15 @@ Terminal_Cursor:
 	pushf
 	cli
 
-	mov	eax, [_ticks]
+	;mov	eax, [_ticks]
+	call	Timer_Get
 	cmp	eax, [cursorTimer]
 	jb	.exit
 
 	call	Terminal_CursorLoop
 	xor	byte [cursor_loop_id], 1
 
-	mov	eax, [_ticks]
+	;mov	eax, [_ticks]
 	add	eax, 200
 	mov	[cursorTimer], eax
 
