@@ -49,7 +49,6 @@ Init16:
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 [bits 32]
-tmpBuffer times 1024 db 0
 Init32:
 	cli
 
@@ -66,9 +65,10 @@ Init32:
 	call	IDT_Init
 
 	; Initialize kernel main services
-	call	Terminal_Init
+	call	Terminal_PreInit
 	print	"Memory init"
 	call	Memory_Init
+	call	Terminal_Init
 
 	; Alloc stack
 	print	"Allocating stack!"
@@ -76,9 +76,6 @@ Init32:
 	call	Memory_Alloc
 	add	eax, 8192
 	mov	esp, eax
-
-	call	LinkedList_Create
-	mov	[kernelHandlers], eax
 
 	; Initialize rest of kernel services
 	print	"Init scheduler"
@@ -123,56 +120,13 @@ kernelHandlers dd 0
 Kernel_Register:
 	rpush	ebp
 
-	push	dword [kernelHandlers]
+	push	kernelHandlers
 	push	dword [ebp + 8]
 	call	LinkedList_Insert
 	add	esp, 8
 
 	rpop
 	ret
-
-	rpush	ebp, ebx
-
-	mov	ebx, [ebp + 8]
-	;mov	ebx, eax
-
-	push	KernelHandlerItem_size
-	call	Memory_Alloc
-	add	esp, 4
-
-	mov	dword [eax + KernelHandlerItem.handler], ebx
-	mov	dword [eax + KernelHandlerItem.next], 0
-
-	cmp	dword [kernelHandlers], 0
-	jnz	.addToList
-
-	mov	dword [kernelHandlers], eax
-	jmp	.exit
-
-.addToList:
-	xchg bx, bx
-	mov	ebx, eax
-	mov	eax, [kernelHandlers]
-.searchLastEntry:
-	cmp	dword [eax + KernelHandlerItem.next], 0
-	jz	.insertEntry
-	push	dword [eax + KernelHandlerItem.next]
-	pop	eax
-	jmp	.searchLastEntry
-
-.insertEntry:
-	mov	dword [eax + KernelHandlerItem.next], ebx
-
-	push	eax
-	push	ebx
-	push	.msg
-	call	Terminal_Print
-	add	esp, 12
-
-.exit:
-	rpop
-	ret
-.msg db "Inserted: %p at %p",0xA,0
 
 Kernel_Unregister:
 	rpush	ebp, ebx
@@ -183,50 +137,18 @@ Kernel_Unregister:
 	ret
 
 Kernel_ExecuteHandlers:
-;	mov	dword [.iteratePointer], 0
-;
-;	push	dword [kernelHandlers]
-;	push	dword .iteratePointer
-;.loop:
-;	call	LinkedList_Iterate
-;	cmp	eax, 0
-;	jz	.exit
-;
-;	print	"Call"
-;	call	dword [.iteratePointer]
-;	jmp	.loop
-;
-;.exit:
-;	add	esp, 8
-;	ret
-
 	mov	eax, [kernelHandlers]
 .loop:
-	cmp	dword [eax + LinkedList.next], 0
-	jz	.exit
-
-	mov	eax, [eax + LinkedList.next]
-	mov	ebx, [eax + LinkedList.data]
-	push	eax
-	call	ebx
-	pop	eax
-.exit:
-	ret
-
-	mov	eax, [kernelHandlers]
-;.loop:
 	cmp	eax, 0
 	jz	.exit
 
-	push	dword [eax + KernelHandlerItem.next]
-	mov	ebx, dword [eax + KernelHandlerItem.handler]
-
+	mov	ebx, [eax + LinkedList.data]
+	mov	eax, [eax + LinkedList.next]
+	push	eax
 	call	ebx
-
 	pop	eax
 	jmp	.loop
-
-;.exit:
+.exit:
 	ret
 .msg db "Address: %p",0xA,0
 .iteratePointer dd 0

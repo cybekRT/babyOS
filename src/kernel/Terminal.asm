@@ -18,7 +18,7 @@ cursorY dw 0
 ; Terminal init
 ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-Terminal_Init:
+Terminal_PreInit:
 	rpush	eax, ecx, edi
 
 	mov	word [cursorX], 0
@@ -33,14 +33,17 @@ Terminal_Init:
 	call	Terminal_Print
 	add	esp, 4
 
-	push	Terminal_Cursor
-	call	Kernel_Register
-	add	esp, 4
-
 	rpop
 	ret
 .helloMsg db OS_NAME,0xA,0xA,0
 .testMsg db "Test: %d, %u, %u, %x, %x, %p",0xA,0
+
+Terminal_Init:
+	push	Terminal_Cursor
+	call	Kernel_Register
+	add	esp, 4
+
+	ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
@@ -521,7 +524,6 @@ Terminal_CursorLoop:
 
 	movzx	eax, ax
 	add	eax, 0xa0000
-	xchg bx, bx
 
 	mov	ecx, fontHeight
 .loop_y:

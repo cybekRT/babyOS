@@ -7,6 +7,10 @@ struc LinkedListHead
 	.next resd 1
 endstruc
 
+%macro ALLOC_LINKED_LIST 1
+	%1 times LinkedListHead_size db 0
+%endmacro
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;
 ; Linked list create
@@ -26,7 +30,6 @@ LinkedList_Create:
 	mov	esi, eax
 	mov	eax, [ebp + 8]
 	mov	dword [esi + LinkedList.next], 0
-	;mov	dword [esi + LinkedList.data], eax
 
 	mov	eax, esi
 	rpop
@@ -70,7 +73,6 @@ LinkedList_Free:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 LinkedList_Insert:
 	rpush	ebp, ebx
-	;sub	esp, 4
 
 	mov	esi, [ebp + 12]	; linked list entry
 	mov	ebx, [ebp + 8]	; data to insert
@@ -78,14 +80,12 @@ LinkedList_Insert:
 	push	LinkedList_size
 	call	Memory_Alloc
 	add	esp, 4
-	;mov	[ebp - 4], eax
 
 	mov	dword [eax + LinkedList.next], 0
 	mov	dword [eax + LinkedList.data], ebx
 
 .addToList:
 	mov	ebx, eax
-	;mov	eax, [ebp + 12]	; linked list entry
 .searchLastEntry:
 	cmp	dword [esi + LinkedList.next], 0
 	jz	.insertEntry
@@ -130,7 +130,6 @@ LinkedList_Iterate:
 .firstEntry:
 	push	dword [eax]
 	pop	dword [ebx]
-	;mov	[ebx], [eax]
 	add	ebx, LinkedList.data
 
 .nextEntry:
@@ -143,8 +142,6 @@ LinkedList_Iterate:
 	pop	ebx
 	mov	eax, [ebp + 8]
 	mov	[eax], ebx
-	;mov	dword [ebp + 8], [ebx]
-	;pop	dword [ebp + 8]
 	mov	eax, 1
 	jmp	.exit
 
