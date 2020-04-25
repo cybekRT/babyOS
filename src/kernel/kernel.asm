@@ -77,6 +77,9 @@ Init32:
 	add	eax, 8192
 	mov	esp, eax
 
+	; Paging
+	call	Paging_Init
+
 	; Initialize rest of kernel services
 	print	"Init scheduler"
 	call	Process_Init
@@ -163,6 +166,7 @@ Kernel_ExecuteHandlers:
 %include "FAT12.asm"
 %include "Panic.asm"
 %include "LinkedList.asm"
+%include "Paging.asm"
 
 %include "Keyboard.inc"
 %include "Keyboard.asm"
