@@ -21,6 +21,7 @@ PAGE_TABLE_FLAG_CACHE_DISABLED	equ (1 << 4)
 PAGE_TABLE_FLAG_ACCESSES		equ (1 << 5)
 PAGE_TABLE_FLAG_DIRTY		equ (1 << 6)
 PAGE_TABLE_FLAG_GLOBAL		equ (1 << 7)
+PAGE_TABLE_ADDRESS_OFFSET		equ 12
 
 %define PAGE_TABLE_ADDRESS(addr) (addr & 0xFFFFF000)
 %define PAGE_TABLE_ENTRY(addr, flags) (PAGE_TABLE_ADDRESS(addr) | flags)
@@ -34,9 +35,9 @@ struc PageTableEntry
 endstruc
 
 pagingDirectory dd 0
+firstPageTable dd 0
 Paging_Init:
 	mov	ecx, 1024 * PageDirectoryEntry_size * 2
-	;push	1024 * PageDirectoryEntry_size
 	push	ecx
 	call	Memory_Alloc
 	add	esp, 4
@@ -51,24 +52,39 @@ Paging_Init:
 	rep stosb
 
 	; Alloc first page
-	mov	ebx, [pagingDirectory]
+	;mov	ebx, [pagingDirectory]
 	push	1024 * PageTableEntry_size * 2
-	push	Memory_Alloc
+	call	Memory_Alloc
 	add	esp, 4
 
-	push	eax
+	add	eax, 0xFFF
+	and	eax, 0xFFFFF000
+	mov	[firstPageTable], eax
 
 	; Fill
-	mov	ecx, 1024
+	mov	ecx, 0
 .fillEntries:
+	mov	ebx, ecx
+	shl	ebx, PAGE_TABLE_ADDRESS_OFFSET
+	or	ebx, PAGE_TABLE_FLAG_PRESENT | PAGE_TABLE_FLAG_READ_WRITE | PAGE_TABLE_FLAG_SUPERVISOR
 
+	mov	[eax], ebx
+	add	eax, 4
 
-	loop	.fillEntries
+	inc	ecx
+	cmp	ecx, 1024
+	jne	.fillEntries
 
 	; Write first directory entry
+	mov	eax, [pagingDirectory]
+	mov	ebx, [firstPageTable]
+	or	ebx, PAGE_DIRECTORY_FLAG_PRESENT | PAGE_DIRECTORY_FLAG_READ_WRITE | PAGE_DIRECTORY_FLAG_SUPERVISOR | PAGE_DIRECTORY_FLAG_PAGE_4K
+	mov	[eax], ebx
 
 	; Write to register
-	mov	eax, [pagingDirectory]
+	xchg bx, bx
+
+	;mov	eax, [pagingDirectory]
 	mov	cr3, eax
 
 	mov	eax, cr0
